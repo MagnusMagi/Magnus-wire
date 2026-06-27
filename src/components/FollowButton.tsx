@@ -17,7 +17,7 @@ export function FollowButton({ slug, locale }: { slug: string; locale: Locale })
   return (
     <button type="button" onClick={toggle} aria-pressed={on}
       className={`font-mono text-[11px] font-bold uppercase tracking-wide px-3 py-1.5 border transition-colors ${on ? "bg-wire text-paper border-wire" : "border-line text-ink-2 hover:border-wire hover:text-wire"}`}>
-      {on ? `✓ ${t(locale, "following")}` : `+ ${t(locale, "follow")}`}
+      {on ? `✓ ${t(locale, "following")}` : `+ ${t(locale, "followBtn")}`}
     </button>
   );
 }
