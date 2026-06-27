@@ -21,8 +21,8 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
-const MAX_PER_RUN = Number(process.env.INGEST_MAX || 15);
-const KEEP = Number(process.env.INGEST_KEEP || 120);
+const MAX_PER_RUN = Number(process.env.INGEST_MAX || 24);
+const KEEP = Number(process.env.INGEST_KEEP || 200);
 
 // Feed başına SABİT bölge: Türkçe kaynaklar→turkiye, Eston kaynaklar→estonya
 // (AI'nın içerikten bölge tahminini override eder). global teknoloji→region yok.
@@ -30,28 +30,61 @@ const KEEP = Number(process.env.INGEST_KEEP || 120);
 // section sabit olan feed'ler "gundem" (genel/güncel haber); diğerleri AI'nın
 // seçtiği teknoloji bölümüne düşer. global/TR/EE/gündem interleave.
 const FEED_LIST = [
-  { url: "https://techcrunch.com/feed/" },
-  { url: "https://shiftdelete.net/feed", region: "turkiye" },
-  { url: "https://tehnika.postimees.ee/rss", region: "estonya" },   // Estonca teknoloji (Postimees)
+  // ── 1. tur: her kategori/bölgeden birer kaynak (round-robin'in ilk turu bunları örnekler) ──
+  { url: "https://techcrunch.com/feed/" },                                            // genel tech (AI sınıflar)
   { url: "https://www.ntv.com.tr/gundem.rss", region: "turkiye", section: "gundem" },
-  { url: "https://feeds.bbci.co.uk/news/business/rss.xml", section: "finans" },             // dünya finans  // TR gündem
+  { url: "https://www.coindesk.com/arc/outboundfeeds/rss/", section: "kripto" },
+  { url: "https://www.nasa.gov/news-release/feed/", section: "uzay" },
+  { url: "https://www.bleepingcomputer.com/feed/", section: "siber" },
+  { url: "https://dev.to/feed", section: "yazilim" },
+  { url: "https://www.sciencedaily.com/rss/all.xml", section: "bilim" },
+  { url: "https://www.eu-startups.com/feed/", region: "avrupa", section: "girisim" },
+  { url: "https://feeds.bbci.co.uk/news/business/rss.xml", section: "finans" },
+  { url: "https://shiftdelete.net/feed", region: "turkiye" },
+  { url: "https://news.err.ee/rss", region: "estonya" },
   { url: "https://www.theverge.com/rss/index.xml" },
+  { url: "https://webrazzi.com/feed/", region: "turkiye", section: "girisim" },
+  { url: "https://tehnika.postimees.ee/rss", region: "estonya" },
+
+  // ── 2. tur: ikinci kaynaklar ──
+  { url: "https://cointelegraph.com/rss", section: "kripto" },
+  { url: "https://www.space.com/feeds/all", section: "uzay" },
+  { url: "https://feeds.feedburner.com/TheHackersNews", section: "siber" },
+  { url: "https://github.blog/feed/", section: "yazilim" },
+  { url: "https://www.newscientist.com/feed/home/", section: "bilim" },
+  { url: "https://techcrunch.com/category/startups/feed/", section: "girisim" },
+  { url: "https://www.bloomberght.com/rss", region: "turkiye", section: "finans" },
   { url: "https://www.webtekno.com/rss.xml", region: "turkiye" },
-  { url: "https://news.err.ee/rss", region: "estonya" },            // ERR (Estonya)
   { url: "https://feeds.bbci.co.uk/news/world/rss.xml", section: "gundem" },
-  { url: "https://www.bloomberght.com/rss", region: "turkiye", section: "finans" },         // TR finans           // dünya gündem
-  { url: "https://hnrss.org/frontpage" },
-  { url: "https://www.donanimhaber.com/rss/tum/", region: "turkiye" },
-  { url: "https://www.err.ee/rss", region: "estonya", section: "gundem" },
-  { url: "https://www.aripaev.ee/rss", region: "estonya", section: "finans" },              // Estonca iş/finans             // EE gündem (Estonca)
-  { url: "https://estonianworld.com/feed/", region: "estonya" },
   { url: "https://feeds.arstechnica.com/arstechnica/technology-lab" },
-  { url: "https://www.technopat.net/feed/", region: "turkiye" },
+  { url: "https://estonianworld.com/feed/", region: "estonya" },
+  { url: "https://www.wired.com/feed/rss" },
+  { url: "https://www.aa.com.tr/tr/rss/default?cat=guncel", region: "turkiye", section: "gundem" },
+  { url: "https://www.dunya.com/rss", region: "turkiye", section: "finans" },
+  { url: "https://www.donanimhaber.com/rss/tum/", region: "turkiye" },
+  { url: "https://news.postimees.ee/rss", region: "estonya" },
+
+  // ── 3. tur: üçüncü kaynaklar / derinlik ──
+  { url: "https://decrypt.co/feed", section: "kripto" },
+  { url: "https://phys.org/rss-feed/space-news/", section: "uzay" },
+  { url: "https://krebsonsecurity.com/feed/", section: "siber" },
+  { url: "https://phys.org/rss-feed/", section: "bilim" },
+  { url: "https://sifted.eu/feed", region: "avrupa", section: "girisim" },
+  { url: "https://hnrss.org/frontpage" },
+  { url: "https://www.engadget.com/rss.xml" },
   { url: "https://www.trthaber.com/manset_articles.rss", region: "turkiye", section: "gundem" },
-  { url: "https://www.dunya.com/rss", region: "turkiye", section: "finans" },               // TR finans
-  { url: "https://www.cnbc.com/id/100003114/device/rss/rss.html", section: "finans" },       // dünya finans // TR gündem
-  { url: "https://www.geenius.ee/feed/", region: "estonya" },       // Estonca dijital (UA ile; 403 ise atlanır)
-  { url: "https://sifted.eu/feed", region: "avrupa" },
+  { url: "https://www.cnbc.com/id/100003114/device/rss/rss.html", section: "finans" },
+  { url: "https://www.technopat.net/feed/", region: "turkiye" },
+  { url: "https://feeds.bbci.co.uk/turkce/rss.xml", region: "turkiye", section: "gundem" },
+  { url: "https://www.aripaev.ee/rss", region: "estonya", section: "finans" },
+  { url: "https://www.geenius.ee/feed/", region: "estonya" },
+  { url: "https://www.technologyreview.com/feed/" },
+  { url: "https://www.chip.com.tr/rss/", region: "turkiye" },
+  { url: "https://rss.dw.com/rdf/rss-tur-all", region: "turkiye", section: "gundem" },
+  { url: "https://www.investing.com/rss/news.rss", section: "finans" },
+  { url: "https://www.marketwatch.com/rss/topstories", section: "finans" },
+  { url: "https://www.log.com.tr/feed/", region: "turkiye" },
+  { url: "https://www.teknoblog.com/feed/", region: "turkiye" },
 ];
 const FEEDS = process.env.INGEST_FEEDS
   ? process.env.INGEST_FEEDS.split(",").map((s) => ({ url: s.trim() })).filter((f) => f.url)
@@ -156,18 +189,20 @@ async function main() {
   log(`aday: ${candidates.length}, tur limiti ${MAX_PER_RUN}`);
 
   let inserted = 0;
-  let gundemCount = 0;
-  const GUNDEM_CAP = Number(process.env.INGEST_GUNDEM_CAP || 6);
+  // Yüksek-hacimli forced section'lar (gündem/finans) tur başına sınırlanır ki
+  // niş kategoriler (uzay, kripto, siber, bilim, yazılım, girişim) slot bulsun.
+  const SECTION_CAPS = { gundem: Number(process.env.INGEST_GUNDEM_CAP || 5), finans: Number(process.env.INGEST_FINANS_CAP || 5) };
+  const secCount = { gundem: 0, finans: 0 };
   const seenTitles = (existing || []).map((r) => normTitle(r.title)).filter((t) => t.length);
   for (const { item, feedTitle, forcedRegion, forcedSection } of candidates.slice(0, MAX_PER_RUN)) {
     try {
-      if (forcedSection === "gundem" && gundemCount >= GUNDEM_CAP) { continue; }
+      if (forcedSection && SECTION_CAPS[forcedSection] != null && secCount[forcedSection] >= SECTION_CAPS[forcedSection]) { continue; }
       const o = await rewrite(item);
       if (forcedRegion) o.region = forcedRegion;
       if (forcedSection && TOPICS[forcedSection]) o.section = forcedSection;
       const nt = normTitle(o.tr.title);
       if (seenTitles.some((t) => jaccard(t, nt) > 0.6)) { log("benzer haber atlandı:", o.tr.title.slice(0, 44)); continue; }
-      if (o.section === "gundem" && gundemCount >= GUNDEM_CAP) { continue; }
+      if (SECTION_CAPS[o.section] != null && secCount[o.section] >= SECTION_CAPS[o.section]) { continue; }
       const hero = extractImage(item) || (await fetchOgImage(item.link));
       const slug = `${slugify(o.tr.title)}-${shortHash(item.link)}`;
       const row = {
@@ -179,7 +214,7 @@ async function main() {
       };
       const { error } = await sb.from("dispatches").upsert(row, { onConflict: "source_url", ignoreDuplicates: true });
       if (error) { log("insert hatası", slug, error.message); continue; }
-      inserted++; seenTitles.push(nt); if (o.section === "gundem") gundemCount++;
+      inserted++; seenTitles.push(nt); if (secCount[o.section] != null) secCount[o.section]++;
       log("eklendi:", o.section, o.region || "-", slug);
     } catch (e) { log("öğe hatası", item.link, e.message); }
   }

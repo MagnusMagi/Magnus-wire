@@ -179,7 +179,7 @@ graph LR
 
 ```mermaid
 flowchart TD
-    RSS[("📡 24 RSS kaynağı<br/>TR · EE · Global")] -->|*/30 dk cron| ING
+    RSS[("📡 51 RSS kaynağı<br/>TR · EE · Global · niş")] -->|*/30 dk cron| ING
 
     subgraph ING["⚙️ scripts/ingest.mjs (flock kilitli)"]
       P1[Parse + dedup<br/>jaccard >0.6 ele] --> P2[og:image crawl] --> P3["🤖 OpenAI yeniden yazım<br/>3 dil × ≥3 paragraf + keyFacts"] --> P4[Doğrulama / Zod]
@@ -210,7 +210,7 @@ flowchart TD
 `scripts/ingest.mjs` her 30 dakikada bir (cron + `flock` ile tek‑örnek garantisi) çalışır:
 
 ```
-RSS feed'leri (24 kaynak, region/section etiketli)
+RSS feed'leri (51 kaynak, her kategoriye adanmış; region/section etiketli)
         │
         ├─ 1. Parse  ........... rss-parser, tarayıcı UA header'ı
         ├─ 2. Dedup  ........... normTitle() + jaccard() benzerlik > 0.6 ise atla
@@ -229,9 +229,10 @@ RSS feed'leri (24 kaynak, region/section etiketli)
 
 | Değişken | Varsayılan | Açıklama |
 |---|---|---|
-| `INGEST_MAX` | `15` | Tek koşuda işlenecek maksimum haber |
-| `INGEST_KEEP` | `120` | Veritabanında tutulacak dispatch sayısı (eskiler budanır) |
-| `INGEST_GUNDEM_CAP` | `6` | Gündem haberi kotası (akışı boğmasın) |
+| `INGEST_MAX` | `24` | Tek koşuda işlenecek maksimum haber |
+| `INGEST_KEEP` | `200` | Veritabanında tutulacak dispatch sayısı (eskiler budanır) |
+| `INGEST_GUNDEM_CAP` | `5` | Gündem haberi tur-başı kotası (akışı boğmasın) |
+| `INGEST_FINANS_CAP` | `5` | Finans haberi tur-başı kotası (niş kategorilere yer açar) |
 | `INGEST_FEEDS` | — | Feed listesini override etmek için (opsiyonel) |
 
 ---
