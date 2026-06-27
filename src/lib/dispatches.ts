@@ -110,3 +110,12 @@ export async function getTrendingTags(limit = 60): Promise<{ tag: string; count:
   for (const r of data as { tags: string[] | null }[]) for (const tg of r.tags || []) counts.set(tg, (counts.get(tg) || 0) + 1);
   return [...counts.entries()].map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count).slice(0, limit);
 }
+
+export async function dispatchesBySourceHost(locale: Locale, host: string, limit = 60): Promise<Dispatch[]> {
+  const sb = supabaseServer();
+  const clean = host.toLowerCase().replace(/[^a-z0-9.-]/g, "");
+  if (!clean) return [];
+  const { data, error } = await sb.from("dispatches").select(COLS).ilike("source_url", `%${clean}%`).order("published_at", { ascending: false }).limit(limit);
+  if (error || !data) return [];
+  return (data as Row[]).map((r) => mapRow(r, locale));
+}

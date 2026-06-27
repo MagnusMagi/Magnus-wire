@@ -49,6 +49,8 @@ export default async function DispatchPage({ params }: { params: Promise<{ local
     .map((s) => s.x);
   const initials = sectionLabel(d.section, locale).slice(0, 2).toUpperCase();
   const pageUrl = `https://news.magnusmagi.com/${locale}/dispatch/${d.slug}`;
+  let srcHost = "";
+  try { if (d.sourceUrl) srcHost = new URL(d.sourceUrl).hostname.replace(/^www\./, ""); } catch {}
   const ld = {
     "@context": "https://schema.org",
     "@type": "NewsArticle",
@@ -132,6 +134,7 @@ export default async function DispatchPage({ params }: { params: Promise<{ local
             )}
             <div className="mt-8"><SourceLink url={d.sourceUrl} name={d.sourceName} locale={locale} /></div>
             <p className="font-mono text-[11px] text-ink-3 mt-3 flex items-start gap-1.5"><span className="text-wire shrink-0" aria-hidden>⚙</span><span>{t(locale, "aiNote")}</span></p>
+            {srcHost && (<Link href={`/${locale}/kaynak/${srcHost}`} className="inline-block mt-2.5 font-mono text-[11px] font-bold text-wire hover:text-signal uppercase tracking-wide">{t(locale, "sourceMore")}: {srcHost} →</Link>)}
             <div className="flex flex-wrap items-center gap-2 mt-9 pt-5 border-t border-line">
               <span className="font-mono text-[11px] uppercase tracking-wide text-ink-3 mr-1">{t(locale, "tagsLabel")}</span>
               {d.tags.map((tg) => (
