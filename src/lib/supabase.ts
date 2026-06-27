@@ -10,3 +10,11 @@ export function supabaseServer() {
   }
   return createClient(url, key, { auth: { persistSession: false } });
 }
+
+// Server-side yazma istemcisi (service_role; yalnız API route'larında, RLS bypass).
+export function supabaseAdmin() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error("SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY tanımlı değil");
+  return createClient(url, key, { auth: { persistSession: false } });
+}
