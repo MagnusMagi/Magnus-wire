@@ -2,6 +2,7 @@ import Link from "next/link";
 import { FOOTER_LINKS } from "@/lib/site";
 import { t, type Locale } from "@/lib/i18n";
 import { NewsletterForm } from "@/components/NewsletterForm";
+import { PushButton } from "@/components/PushButton";
 
 export function Footer({ locale }: { locale: Locale }) {
   return (
@@ -11,6 +12,7 @@ export function Footer({ locale }: { locale: Locale }) {
           <h2 className="font-serif text-[24px] font-black tracking-tight m-0">{t(locale, "newsletterTitle")}</h2>
           <p className="font-mono text-[12.5px] text-ink-2 mt-1.5 mb-4">{t(locale, "newsletterSub")}</p>
           <NewsletterForm locale={locale} />
+          <div className="mt-4"><PushButton locale={locale} /></div>
         </div>
         <p className="font-mono text-[11px] text-ink-3 max-w-[200px] leading-relaxed">
           <span className="text-wire">●</span> {t(locale, "aiNote")}
