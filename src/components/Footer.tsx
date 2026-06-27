@@ -15,6 +15,7 @@ export function Footer({ locale }: { locale: Locale }) {
               {t(locale, l.key)}
             </Link>
           ))}
+          <Link href={`/${locale}/etiketler`} className="text-xs text-ink-2 uppercase tracking-wide hover:text-signal">{t(locale, "tagsLabel")}</Link>
         </nav>
         <span className="text-[11.5px] text-ink-3">{t(locale, "copy")}</span>
       </div>

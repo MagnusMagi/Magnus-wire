@@ -101,3 +101,12 @@ export async function getMostRead(locale: Locale, limit = 5): Promise<Dispatch[]
   if (error || !data) { if (error) console.error("getMostRead:", error.message); return []; }
   return (data as Row[]).map((r) => mapRow(r, locale));
 }
+
+export async function getTrendingTags(limit = 60): Promise<{ tag: string; count: number }[]> {
+  const sb = supabaseServer();
+  const { data, error } = await sb.from("dispatches").select("tags").limit(500);
+  if (error || !data) return [];
+  const counts = new Map<string, number>();
+  for (const r of data as { tags: string[] | null }[]) for (const tg of r.tags || []) counts.set(tg, (counts.get(tg) || 0) + 1);
+  return [...counts.entries()].map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count).slice(0, limit);
+}
