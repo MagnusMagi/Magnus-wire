@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { allPages } from "content-collections";
 import { MDXContent } from "@content-collections/mdx/react";
 import { CatNav } from "@/components/CatNav";
+import { MarketTicker } from "@/components/MarketTicker";
 import { Dispatch } from "@/components/Dispatch";
 import { mdxComponents } from "@/components/mdx";
 import { ContactForm } from "@/components/ContactForm";
@@ -51,6 +52,7 @@ export default async function SlugPage({ params }: { params: Promise<{ locale: s
               {sectionLabel(slug, locale)}
             </h1>
           </header>
+          {slug === "finans" && <MarketTicker />}
           {list.length === 0 ? (
             <p className="font-mono text-ink-2 py-10">{t(locale, "emptySection")}</p>
           ) : (
