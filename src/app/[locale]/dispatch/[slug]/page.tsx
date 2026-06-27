@@ -12,6 +12,7 @@ import { SourceLink } from "@/components/SourceLink";
 import { ReadingProgress } from "@/components/ReadingProgress";
 import { ViewBeacon } from "@/components/ViewBeacon";
 import { BookmarkButton } from "@/components/BookmarkButton";
+import { AudioPlayer } from "@/components/AudioPlayer";
 import { ShareButtons } from "@/components/ShareButtons";
 import { LOCALES, t, isLocale, type Locale } from "@/lib/i18n";
 import { altLanguages, SITE_URL } from "@/lib/seo";
@@ -114,6 +115,8 @@ export default async function DispatchPage({ params }: { params: Promise<{ local
             <ArticleImage hero={d.hero} slug={d.slug} alt={d.title} ratio="aspect-[16/9]" />
             <figcaption className="font-mono text-[11.5px] text-ink-3 mt-2 break-words">{"Foto: "}{(() => { try { return d.hero ? new URL(d.hero).hostname.replace(/^www\./, "") : "Magnus Wire"; } catch { return "Magnus Wire"; } })()}</figcaption>
           </figure>
+
+          <div className="max-w-[680px] mx-auto mb-3"><AudioPlayer slug={d.slug} locale={locale} /></div>
 
           <div className="wire-prose max-w-[680px] mx-auto">
             <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdxComponents}>{d.body}</ReactMarkdown>
