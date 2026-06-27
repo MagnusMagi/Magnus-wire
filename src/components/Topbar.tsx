@@ -9,6 +9,8 @@ export function Topbar({ locale }: { locale: Locale }) {
         <LiveDate locale={locale} />
         <nav aria-label="links" className="flex items-center gap-3">
           <span className="flex items-center gap-2">
+            <a href={`/${locale}/bugun`} className="hover:text-white font-bold text-signal">{t(locale, "todayTitle")}</a>
+            <span className="text-[#5a574e]">/</span>
             <a href={`/${locale}/hakkimizda`} className="hover:text-white">{t(locale, "about")}</a>
             <span className="text-[#5a574e]">/</span>
             <a href={`/${locale}/rss.xml`} className="hover:text-white">RSS</a>
