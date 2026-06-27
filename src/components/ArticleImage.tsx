@@ -10,7 +10,8 @@ export function ArticleImage({
   hero?: string | null; slug: string; alt?: string; ratio?: string;
 }) {
   const fallback = `https://picsum.photos/seed/${encodeURIComponent(slug)}/1200/900?grayscale`;
-  const [src, setSrc] = useState(hero || fallback);
+  const proxied = hero ? `/api/img?u=${encodeURIComponent(hero)}` : fallback;
+  const [src, setSrc] = useState(proxied);
   return (
     <div className={`${ratio} overflow-hidden border border-line bg-panel`}>
       <img src={src} alt={alt} loading="lazy" referrerPolicy="no-referrer"
