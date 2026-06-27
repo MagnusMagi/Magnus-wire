@@ -7,7 +7,7 @@ import type { Locale } from "@/lib/i18n";
 export function Dispatch({ d, ago, index, locale }: { d: D; ago: string; index: number; locale: Locale }) {
   const hhmm = d.time.slice(0, 5);
   return (
-    <li className="grid grid-cols-[76px_1fr] gap-[22px] py-[22px] wire-printin border-b border-dotted border-line last:border-0"
+    <li className="grid grid-cols-[60px_minmax(0,1fr)] sm:grid-cols-[76px_minmax(0,1fr)] gap-3 sm:gap-[22px] py-[22px] wire-printin border-b border-dotted border-line last:border-0"
         style={{ animationDelay: `${60 + index * 80}ms` }}>
       <div className="text-right pt-1 font-mono text-xs text-ink-2 whitespace-nowrap">
         {hhmm}<span className="block text-[10px] text-ink-3 mt-0.5">{ago}</span>
