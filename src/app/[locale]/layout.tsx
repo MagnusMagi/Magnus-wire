@@ -4,6 +4,8 @@ import { Topbar } from "@/components/Topbar";
 import { Ticker } from "@/components/Ticker";
 import { Masthead } from "@/components/Masthead";
 import { Footer } from "@/components/Footer";
+import { ScrollTop } from "@/components/ScrollTop";
+import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { LOCALES, isLocale } from "@/lib/i18n";
 import { getDispatches } from "@/lib/dispatches";
 
@@ -34,6 +36,8 @@ export default async function LocaleLayout({
         <Masthead locale={locale} />
         {children}
         <Footer locale={locale} />
+        <ScrollTop />
+        <KeyboardShortcuts />
       </body>
     </html>
   );
