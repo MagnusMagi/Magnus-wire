@@ -12,6 +12,8 @@ export function Topbar({ locale }: { locale: Locale }) {
             <a href={`/${locale}/hakkimizda`} className="hover:text-white">{t(locale, "about")}</a>
             <span className="text-[#5a574e]">/</span>
             <a href={`/${locale}/rss.xml`} className="hover:text-white">RSS</a>
+            <span className="text-[#5a574e]">/</span>
+            <a href={`/${locale}/okuma-listesi`} className="hover:text-white">{t(locale, "readingList")}</a>
           </span>
           <span className="text-[#5a574e]">·</span>
           <LocaleSwitcher locale={locale} />

@@ -11,6 +11,7 @@ import { sectionLabel } from "@/lib/site";
 import { SourceLink } from "@/components/SourceLink";
 import { ReadingProgress } from "@/components/ReadingProgress";
 import { ViewBeacon } from "@/components/ViewBeacon";
+import { BookmarkButton } from "@/components/BookmarkButton";
 import { ShareButtons } from "@/components/ShareButtons";
 import { LOCALES, t, isLocale, type Locale } from "@/lib/i18n";
 import { altLanguages, SITE_URL } from "@/lib/seo";
@@ -103,6 +104,7 @@ export default async function DispatchPage({ params }: { params: Promise<{ local
               {LOCALES.map((lc) => (
                 <Link key={lc} href={`/${lc}/dispatch/${d.slug}`} className={lc === locale ? "text-signal font-bold" : "text-wire hover:text-signal"}>{lc.toUpperCase()}</Link>
               ))}
+              <span className="ml-auto"><BookmarkButton slug={d.slug} title={d.title} section={d.section} locale={locale} /></span>
             </div>
           </header>
 
