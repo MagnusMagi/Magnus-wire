@@ -5,6 +5,7 @@ import { allPages } from "content-collections";
 import { MDXContent } from "@content-collections/mdx/react";
 import { CatNav } from "@/components/CatNav";
 import { MarketTicker } from "@/components/MarketTicker";
+import { FollowButton } from "@/components/FollowButton";
 import { Dispatch } from "@/components/Dispatch";
 import { mdxComponents } from "@/components/mdx";
 import { ContactForm } from "@/components/ContactForm";
@@ -48,9 +49,12 @@ export default async function SlugPage({ params }: { params: Promise<{ locale: s
             <span className="font-mono text-[11px] font-bold uppercase tracking-widest text-wire">
               {t(locale, isRegion ? "regionWord" : "sectionWord")}
             </span>
-            <h1 className="font-serif text-[clamp(32px,1.8rem+2vw,48px)] font-black tracking-tight leading-none mt-2">
-              {sectionLabel(slug, locale)}
-            </h1>
+            <div className="flex flex-wrap items-end justify-between gap-3 mt-2">
+              <h1 className="font-serif text-[clamp(32px,1.8rem+2vw,48px)] font-black tracking-tight leading-none">
+                {sectionLabel(slug, locale)}
+              </h1>
+              <FollowButton slug={slug} locale={locale} />
+            </div>
           </header>
           {slug === "finans" && <MarketTicker />}
           {list.length === 0 ? (
