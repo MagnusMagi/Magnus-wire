@@ -13,6 +13,7 @@ import { ReadingProgress } from "@/components/ReadingProgress";
 import { ViewBeacon } from "@/components/ViewBeacon";
 import { ShareButtons } from "@/components/ShareButtons";
 import { LOCALES, t, isLocale, type Locale } from "@/lib/i18n";
+import { altLanguages, SITE_URL } from "@/lib/seo";
 
 export const revalidate = 3600;
 
@@ -26,7 +27,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const locale = (isLocale(raw) ? raw : "tr") as Locale;
   const d = await getDispatch(locale, slug);
   if (!d) return {};
-  return { title: d.title, description: d.summary, openGraph: { title: d.title, description: d.summary, type: "article" } };
+  return { title: d.title, description: d.summary, alternates: { canonical: `${SITE_URL}/${locale}/dispatch/${slug}`, languages: altLanguages(`/dispatch/${slug}`) }, openGraph: { title: d.title, description: d.summary, type: "article" } };
 }
 
 export default async function DispatchPage({ params }: { params: Promise<{ locale: string; slug: string }> }) {

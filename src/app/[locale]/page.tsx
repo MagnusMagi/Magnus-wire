@@ -6,9 +6,17 @@ import { ArticleImage } from "@/components/ArticleImage";
 import { SourceLink } from "@/components/SourceLink";
 import { getDispatches, agoLabel, latestTs } from "@/lib/dispatches";
 import { sectionLabel } from "@/lib/site";
+import type { Metadata } from "next";
 import { t, isLocale, type Locale } from "@/lib/i18n";
+import { altLanguages, SITE_URL } from "@/lib/seo";
 
 export const revalidate = 3600;
+
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+  const { locale: raw } = await params;
+  const locale = (isLocale(raw) ? raw : "tr") as Locale;
+  return { alternates: { canonical: `${SITE_URL}/${locale}`, languages: altLanguages("") } };
+}
 
 export default async function Home({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: raw } = await params;
