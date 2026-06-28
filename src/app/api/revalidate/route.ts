@@ -3,7 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 // Cron ingest sonrası çağrılır: tüm site içeriğini tazeler.
 export async function POST(req: NextRequest) {
-  const secret = req.nextUrl.searchParams.get("secret");
+  // Secret header'dan okunur (query string log'lara/Referer'a sızdığı için kullanılmaz).
+  const secret = req.headers.get("x-revalidate-secret");
   if (!process.env.REVALIDATE_SECRET || secret !== process.env.REVALIDATE_SECRET) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }

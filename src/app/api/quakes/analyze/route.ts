@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getQuakes, type Quake, type QuakeSource } from "@/lib/quake";
+import { clientIp, rateLimited } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -92,6 +93,8 @@ export async function GET(req: NextRequest) {
   const ck = `${source}:${locale}`;
   const hit = cache.get(ck);
   if (hit && Date.now() - hit.at < TTL) return NextResponse.json(hit.payload);
+  // Cache miss = OpenAI maliyeti → IP başına dakikada 5 ile sınırla.
+  if (rateLimited(`quake-ai:${clientIp(req)}`, 5)) return NextResponse.json({ error: "rate" }, { status: 429 });
   const payload = await analyze(source, locale);
   if (payload.text) cache.set(ck, { at: Date.now(), payload });
   return NextResponse.json(payload);

@@ -71,7 +71,7 @@ export default async function DispatchPage({ params }: { params: Promise<{ local
     <>
       <ReadingProgress />
       <ViewBeacon slug={d.slug} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld).replace(/</g, "\\u003c") }} />
       <CatNav locale={locale} active={d.section} />
       <main className="mx-auto max-w-[1240px] px-6 pt-7 pb-18">
         <nav aria-label="crumb" className="max-w-[760px] mx-auto mb-5 font-mono text-[11.5px] tracking-wide text-ink-3 uppercase">

@@ -32,4 +32,4 @@ for (const r of data || []) {
   else console.log("yok:", r.slug);
 }
 console.log(`bitti. eklenen görsel: ${ok}`);
-if (process.env.REVALIDATE_SECRET) { try { const x = await fetch(`http://127.0.0.1:3360/api/revalidate?secret=${process.env.REVALIDATE_SECRET}`, { method: "POST" }); console.log("revalidate:", x.status); } catch {} }
+if (process.env.REVALIDATE_SECRET) { try { const x = await fetch("http://127.0.0.1:3360/api/revalidate", { method: "POST", headers: { "x-revalidate-secret": process.env.REVALIDATE_SECRET } }); console.log("revalidate:", x.status); } catch {} }

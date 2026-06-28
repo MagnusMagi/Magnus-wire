@@ -228,7 +228,7 @@ async function main() {
   if (all && all.length > KEEP) { const drop = all.slice(KEEP).map((r) => r.id); const { error } = await sb.from("dispatches").delete().in("id", drop); if (!error) log(`budama: ${drop.length}`); }
 
   if (process.env.REVALIDATE_SECRET) {
-    try { const r = await fetch(`http://127.0.0.1:3360/api/revalidate?secret=${process.env.REVALIDATE_SECRET}`, { method: "POST" }); log("revalidate:", r.status); } catch (e) { log("revalidate hatası", e.message); }
+    try { const r = await fetch("http://127.0.0.1:3360/api/revalidate", { method: "POST", headers: { "x-revalidate-secret": process.env.REVALIDATE_SECRET } }); log("revalidate:", r.status); } catch (e) { log("revalidate hatası", e.message); }
   }
   log(`bitti. eklenen: ${inserted}`);
 }

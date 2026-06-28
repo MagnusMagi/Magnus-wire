@@ -1,9 +1,11 @@
 import { supabaseAdmin } from "@/lib/supabase";
 import { isLocale } from "@/lib/i18n";
+import { clientIp, rateLimited } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
+  if (rateLimited(`push-sub:${clientIp(req)}`, 10)) return Response.json({ error: "rate" }, { status: 429 });
   let body: { subscription?: { endpoint?: string; keys?: { p256dh?: string; auth?: string } }; locale?: string };
   try { body = await req.json(); } catch { return Response.json({ error: "bad" }, { status: 400 }); }
   const sub = body.subscription;

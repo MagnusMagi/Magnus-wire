@@ -18,7 +18,7 @@ export default async function OgImage({ params }: { params: Promise<{ locale: st
     (
       <div style={{ width: "100%", height: "100%", background: "#1a1916", color: "#edebe4", display: "flex", flexDirection: "column", justifyContent: "space-between", padding: 70 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: 2 }}>Magnus</div>
+          <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: 2 }}>Magi</div>
           <div style={{ display: "flex", background: "#edebe4", color: "#1a1916", fontSize: 22, fontWeight: 800, letterSpacing: 3, padding: "5px 13px" }}>WIRE</div>
         </div>
         <div style={{ display: "flex", fontSize: title.length > 78 ? 50 : 62, fontWeight: 800, lineHeight: 1.08, maxWidth: 1040 }}>{title}</div>

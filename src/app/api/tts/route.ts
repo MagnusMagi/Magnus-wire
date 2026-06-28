@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { getDispatch } from "@/lib/dispatches";
 import { isLocale, type Locale } from "@/lib/i18n";
+import { clientIp, rateLimited } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -20,6 +21,8 @@ export async function GET(req: Request) {
       const buf = await readFile(file);
       return new Response(new Uint8Array(buf), { headers: { "Content-Type": "audio/mpeg", "Cache-Control": "public, max-age=604800" } });
     }
+    // Cache yok = OpenAI TTS maliyeti → IP başına dakikada 5 ile sınırla.
+    if (rateLimited(`tts:${clientIp(req)}`, 5)) return new Response("rate", { status: 429 });
     const d = await getDispatch(locale, slug);
     if (!d) return new Response("not found", { status: 404 });
     const text = `${d.title}. ${(d.body || "").replace(/[#*_>`\[\]()]/g, " ").replace(/\s+/g, " ")}`.slice(0, 4000);
