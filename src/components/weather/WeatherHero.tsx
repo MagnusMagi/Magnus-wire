@@ -79,7 +79,7 @@ export function WeatherHero({ defaultCity, locale }: { defaultCity: CityWeather;
               ))}
             </div>
           )}
-          <div className="grid grid-cols-3 gap-1.5 mt-1">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mt-1">
             <Chip label={t(locale, "wWind")} value={`${cardinal(cur?.windDir, locale)} ${Math.round(cur?.wind ?? defaultCity.wind)}`} sub="km/h" />
             <Chip label={t(locale, "wHumidity")} value={`${cur?.humidity ?? defaultCity.humidity}%`} />
             <Chip label={t(locale, "wPressure")} value={cur?.pressure != null ? String(Math.round(cur.pressure)) : "—"} sub="hPa" />
