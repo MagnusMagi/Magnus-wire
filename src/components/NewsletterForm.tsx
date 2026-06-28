@@ -19,17 +19,17 @@ export function NewsletterForm({ locale }: { locale: Locale }) {
     } catch { setState("error"); }
   };
   if (state === "ok")
-    return <p className="font-mono text-[12px] text-wire">✓ {t(locale, "subscribed")}</p>;
+    return <p className="font-mono text-[12.5px] text-wire border border-wire/40 bg-wire/5 px-3.5 py-2.5 max-w-md">✓ {t(locale, "subscribed")}</p>;
   return (
-    <form onSubmit={submit} className="flex flex-wrap items-stretch gap-2 max-w-sm">
+    <form onSubmit={submit} className="flex items-stretch w-full max-w-md border border-ink bg-paper focus-within:border-wire transition-colors">
       <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
         placeholder={t(locale, "emailPlaceholder")} aria-label={t(locale, "emailPlaceholder")}
-        className="flex-1 min-w-0 bg-paper border border-line px-3 py-2 font-mono text-[12.5px] text-ink placeholder:text-ink-3 focus:outline-none focus:border-wire" />
+        className="flex-1 min-w-0 bg-transparent px-3.5 py-2.5 font-mono text-[12.5px] text-ink placeholder:text-ink-3 focus:outline-none" />
       <button type="submit" disabled={state === "loading"}
-        className="font-mono text-[11px] font-bold uppercase tracking-wide px-4 py-2 bg-ink text-paper hover:bg-wire transition-colors disabled:opacity-50">
+        className="font-mono text-[11px] font-bold uppercase tracking-wide px-5 py-2.5 bg-ink text-paper hover:bg-wire transition-colors disabled:opacity-50 whitespace-nowrap">
         {state === "loading" ? "…" : t(locale, "subscribe")}
       </button>
-      {state === "error" && <span className="w-full font-mono text-[11px] text-signal">{t(locale, "subscribeError")}</span>}
+      {state === "error" && <span className="w-full font-mono text-[11px] text-signal mt-1">{t(locale, "subscribeError")}</span>}
     </form>
   );
 }

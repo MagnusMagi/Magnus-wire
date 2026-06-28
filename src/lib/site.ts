@@ -1,6 +1,6 @@
 import type { Locale } from "./i18n";
 
-export const SITE = { name: "Magnus Wire", domain: "news.magnusmagi.com" } as const;
+export const SITE = { name: "MagiWire", domain: "news.magnusmagi.com" } as const;
 
 export type SectionKind = "topic" | "region";
 export interface Section {
@@ -11,13 +11,13 @@ export interface Section {
 
 export const TOPICS: Section[] = [
   { slug: "gundem", kind: "topic", label: { tr: "Gündem", en: "Headlines", et: "Päevakaja" } },
-  { slug: "finans", kind: "topic", label: { tr: "Finans", en: "Finance", et: "Rahandus" } },
   { slug: "yapay-zeka", kind: "topic", label: { tr: "Yapay Zeka", en: "AI", et: "Tehisintellekt" } },
   { slug: "yazilim", kind: "topic", label: { tr: "Yazılım", en: "Software", et: "Tarkvara" } },
   { slug: "donanim", kind: "topic", label: { tr: "Donanım", en: "Hardware", et: "Riistvara" } },
   { slug: "bilim", kind: "topic", label: { tr: "Bilim", en: "Science", et: "Teadus" } },
   { slug: "borsa", kind: "topic", label: { tr: "Borsa", en: "Markets", et: "Börs" } },
   { slug: "hava", kind: "topic", label: { tr: "Hava", en: "Weather", et: "Ilm" } },
+  { slug: "deprem", kind: "topic", label: { tr: "Deprem", en: "Earthquakes", et: "Maavärinad" } },
   { slug: "kripto", kind: "topic", label: { tr: "Kripto", en: "Crypto", et: "Krüpto" } },
   { slug: "siber", kind: "topic", label: { tr: "Siber", en: "Cyber", et: "Küber" } },
   { slug: "uzay", kind: "topic", label: { tr: "Uzay", en: "Space", et: "Kosmos" } },
@@ -30,7 +30,14 @@ export const REGIONS: Section[] = [
   { slug: "abd", kind: "region", label: { tr: "ABD", en: "USA", et: "USA" } },
 ];
 
-export const ALL_SECTIONS: Section[] = [...TOPICS, ...REGIONS];
+// Nav'da görünmeyen ama içerik etiketi olarak yaşayan bölümler.
+// "finans" sayfası kaldırıldı (borsa yeterli) ama dispatch'ler hâlâ bu bölüme
+// sınıflanıyor ve Borsa'da "Piyasa Haberleri" olarak gösteriliyor → etiketi gerekli.
+export const CONTENT_SECTIONS: Section[] = [
+  { slug: "finans", kind: "topic", label: { tr: "Finans", en: "Finance", et: "Rahandus" } },
+];
+
+export const ALL_SECTIONS: Section[] = [...TOPICS, ...REGIONS, ...CONTENT_SECTIONS];
 export const TOPIC_SLUGS = TOPICS.map((s) => s.slug);
 export const REGION_SLUGS = REGIONS.map((s) => s.slug);
 

@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Magnus Wire",
+    name: "MagiWire",
     short_name: "WIRE",
     description: "Teknolojinin ve bölgenin canlı tel servisi — TR/EN/ET.",
     start_url: "/tr",

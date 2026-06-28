@@ -5,8 +5,8 @@ export function Masthead({ locale }: { locale: Locale }) {
   return (
     <header className="border-b border-line">
       <div className="mx-auto max-w-[1240px] px-6 h-24 flex items-center justify-between">
-        <Link href={`/${locale}`} aria-label="Magnus Wire" className="inline-flex items-baseline gap-3">
-          <span className="font-serif text-[40px] font-black tracking-tight leading-none">Magnus</span>
+        <Link href={`/${locale}`} aria-label="MagiWire" className="inline-flex items-baseline gap-3">
+          <span className="font-serif text-[40px] font-black tracking-tight leading-none">Magi</span>
           <span className="font-mono text-sm font-bold tracking-[0.22em] text-paper bg-ink px-[9px] py-1 -translate-y-[6px]">WIRE</span>
         </Link>
         <form role="search" className="hidden sm:flex items-stretch" action={`/${locale}/ara`} method="get">
