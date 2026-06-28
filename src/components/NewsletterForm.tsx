@@ -4,7 +4,7 @@ import { t, type Locale } from "@/lib/i18n";
 
 export function NewsletterForm({ locale }: { locale: Locale }) {
   const [email, setEmail] = useState("");
-  const [state, setState] = useState<"idle" | "loading" | "ok" | "error">("idle");
+  const [state, setState] = useState<"idle" | "loading" | "ok" | "pending" | "error">("idle");
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
@@ -15,11 +15,12 @@ export function NewsletterForm({ locale }: { locale: Locale }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, locale }),
       });
-      setState(r.ok ? "ok" : "error");
+      const data = await r.json().catch(() => ({}));
+      setState(r.ok ? (data.pending ? "pending" : "ok") : "error");
     } catch { setState("error"); }
   };
-  if (state === "ok")
-    return <p className="font-mono text-[12.5px] text-wire border border-wire/40 bg-wire/5 px-3.5 py-2.5 max-w-md">✓ {t(locale, "subscribed")}</p>;
+  if (state === "ok" || state === "pending")
+    return <p className="font-mono text-[12.5px] text-wire border border-wire/40 bg-wire/5 px-3.5 py-2.5 max-w-md">✓ {t(locale, state === "pending" ? "subscribePending" : "subscribed")}</p>;
   return (
     <div className="w-full max-w-md">
       <form onSubmit={submit} className="flex items-stretch w-full border border-ink bg-paper focus-within:border-wire transition-colors">
