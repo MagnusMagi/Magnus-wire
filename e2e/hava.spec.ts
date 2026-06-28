@@ -24,4 +24,19 @@ test.describe("Hava (weather) page", () => {
     await expect(dialog).toBeVisible();
     await expect(dialog.locator("text=7 Günlük Tahmin")).toBeVisible();
   });
+
+  test("hero shows a big featured view with precipitation radar", async ({ page }) => {
+    await page.goto("/tr/hava");
+    await expect(page.locator("text=Yağış Radarı").first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('iframe[src*="embed.windy.com"]')).toHaveCount(1);
+  });
+
+  test("pinning a city sets it as the hero default", async ({ page }) => {
+    await page.goto("/tr/hava");
+    const pin = page.getByRole("button", { name: "Varsayılan yap" }).first();
+    await expect(pin).toBeVisible({ timeout: 10000 });
+    await pin.click();
+    await expect(page.getByRole("button", { name: "Varsayılan şehir" }).first()).toBeVisible();
+  });
+
 });
