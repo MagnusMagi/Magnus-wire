@@ -5,6 +5,8 @@ import { allPages } from "content-collections";
 import { MDXContent } from "@content-collections/mdx/react";
 import { CatNav } from "@/components/CatNav";
 import { MarketTicker } from "@/components/MarketTicker";
+import { MarketsBoard } from "@/components/markets/MarketsBoard";
+import { WeatherBoard } from "@/components/weather/WeatherBoard";
 import { FollowButton } from "@/components/FollowButton";
 import { Dispatch } from "@/components/Dispatch";
 import { mdxComponents } from "@/components/mdx";
@@ -39,7 +41,13 @@ export default async function SlugPage({ params }: { params: Promise<{ locale: s
 
   // Kategori (konu veya bölge)
   if (isTopic || isRegion) {
-    const list = isTopic ? await dispatchesBySection(locale, slug) : await dispatchesByRegion(locale, slug);
+    const isBorsa = slug === "borsa";
+    // Borsa: özel piyasa panosu + altında piyasa (finans) haberleri.
+    const list = isBorsa
+      ? await dispatchesBySection(locale, "finans")
+      : isTopic
+        ? await dispatchesBySection(locale, slug)
+        : await dispatchesByRegion(locale, slug);
     const anchor = latestTs(list);
     return (
       <>
@@ -56,9 +64,16 @@ export default async function SlugPage({ params }: { params: Promise<{ locale: s
               <FollowButton slug={slug} locale={locale} />
             </div>
           </header>
-          {slug === "finans" && <MarketTicker />}
+          {slug === "finans" && <MarketTicker locale={locale} />}
+          {isBorsa && <MarketsBoard locale={locale} />}
+          {isBorsa && <WeatherBoard locale={locale} />}
+          {isBorsa && list.length > 0 && (
+            <h2 className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-wire border-b border-line pb-2 mb-4">
+              {t(locale, "marketNews")}
+            </h2>
+          )}
           {list.length === 0 ? (
-            <p className="font-mono text-ink-2 py-10">{t(locale, "emptySection")}</p>
+            !isBorsa && <p className="font-mono text-ink-2 py-10">{t(locale, "emptySection")}</p>
           ) : (
             <ul className="m-0 p-0 list-none max-w-[820px]">
               {list.map((d, i) => (

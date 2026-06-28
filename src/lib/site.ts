@@ -16,7 +16,7 @@ export const TOPICS: Section[] = [
   { slug: "yazilim", kind: "topic", label: { tr: "Yazılım", en: "Software", et: "Tarkvara" } },
   { slug: "donanim", kind: "topic", label: { tr: "Donanım", en: "Hardware", et: "Riistvara" } },
   { slug: "bilim", kind: "topic", label: { tr: "Bilim", en: "Science", et: "Teadus" } },
-  { slug: "girisim", kind: "topic", label: { tr: "Girişim", en: "Startups", et: "Idufirmad" } },
+  { slug: "borsa", kind: "topic", label: { tr: "Borsa", en: "Markets", et: "Börs" } },
   { slug: "kripto", kind: "topic", label: { tr: "Kripto", en: "Crypto", et: "Krüpto" } },
   { slug: "siber", kind: "topic", label: { tr: "Siber", en: "Cyber", et: "Küber" } },
   { slug: "uzay", kind: "topic", label: { tr: "Uzay", en: "Space", et: "Kosmos" } },
