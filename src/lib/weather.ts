@@ -122,3 +122,19 @@ export async function getWeather(locale: Locale): Promise<{ cities: CityWeather[
     return { cities: [], asOf: new Date() };
   }
 }
+
+// Basit hava uyarıları (resmi alarm değil; eşik bazlı türetilmiş).
+export function advisories(
+  o: { code?: number | null; tmax?: number | null; tmin?: number | null; wind?: number | null; aqi?: number | null },
+  locale: Locale,
+): { emoji: string; text: string }[] {
+  const L = (tr: string, en: string, et: string) => ({ tr, en, et }[locale]);
+  const out: { emoji: string; text: string }[] = [];
+  if (o.code != null && o.code >= 95) out.push({ emoji: "⛈️", text: L("Gök gürültülü fırtına", "Thunderstorm", "Äike") });
+  if (o.code === 75 || o.code === 86) out.push({ emoji: "❄️", text: L("Yoğun kar", "Heavy snow", "Tugev lumi") });
+  if (o.tmax != null && o.tmax >= 35) out.push({ emoji: "🔥", text: L("Aşırı sıcak", "Extreme heat", "Äärmuslik kuumus") });
+  if (o.tmin != null && o.tmin <= -10) out.push({ emoji: "🥶", text: L("Aşırı soğuk", "Extreme cold", "Äärmuslik külm") });
+  if (o.wind != null && o.wind >= 50) out.push({ emoji: "💨", text: L("Kuvvetli rüzgâr", "Strong wind", "Tugev tuul") });
+  if (o.aqi != null && o.aqi > 80) out.push({ emoji: "😷", text: L("Kötü hava kalitesi", "Poor air quality", "Halb õhukvaliteet") });
+  return out;
+}

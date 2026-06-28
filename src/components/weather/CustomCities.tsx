@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { WeatherCard } from "./WeatherCard";
 import { WeatherDetailModal } from "./WeatherDetailModal";
 import { CitySearch } from "./CitySearch";
+import { FavPin } from "./FavPin";
 import { useCities } from "./useCities";
 import { t, type Locale } from "@/lib/i18n";
 import type { CityWeather } from "@/lib/weather";
@@ -22,7 +23,7 @@ export function CustomCities({ locale }: { locale: Locale }) {
           if (!alive || !d?.current) return;
           setWx((prev) => ({
             ...prev,
-            [c.id]: { name: c.name, lat: c.lat, lon: c.lon, temp: d.current.temp, code: d.current.code, wind: d.current.wind, humidity: d.current.humidity },
+            [c.id]: { name: c.name, lat: c.lat, lon: c.lon, temp: d.current.temp, code: d.current.code, wind: d.current.wind, humidity: d.current.humidity, tmax: d.daily?.[0]?.tmax ?? null, tmin: d.daily?.[0]?.tmin ?? null },
           }));
         })
         .catch(() => {});
@@ -50,6 +51,7 @@ export function CustomCities({ locale }: { locale: Locale }) {
                     {c.name}…
                   </div>
                 )}
+                <FavPin city={{ name: c.name, lat: c.lat, lon: c.lon }} locale={locale} />
                 <button type="button" onClick={() => remove(c.id)} aria-label="Remove city"
                   className="absolute top-1.5 right-1.5 z-10 w-6 h-6 grid place-items-center text-ink-3 hover:text-signal text-[16px] leading-none">×</button>
               </div>

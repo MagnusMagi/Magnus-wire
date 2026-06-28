@@ -1,6 +1,7 @@
 import { getWeather } from "@/lib/weather";
 import { WeatherGrid } from "./WeatherGrid";
 import { CustomCities } from "./CustomCities";
+import { WeatherHero } from "./WeatherHero";
 import { t, type Locale } from "@/lib/i18n";
 
 function formatAsOf(asOf: Date, locale: Locale): string {
@@ -17,6 +18,7 @@ export async function WeatherBoard({ locale }: { locale: Locale }) {
   const { cities, asOf } = await getWeather(locale);
   return (
     <section className="mb-10">
+      {cities.length > 0 && <WeatherHero defaultCity={cities[0]} locale={locale} />}
       <div className="flex items-center justify-between gap-3 border-b border-line pb-2 mb-5">
         <span className="inline-flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-widest text-wire">
           <span className="w-[6px] h-[6px] rounded-full bg-wire wire-pulse" />
