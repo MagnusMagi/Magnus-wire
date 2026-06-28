@@ -1,5 +1,6 @@
 import { getWeather } from "@/lib/weather";
 import { WeatherGrid } from "./WeatherGrid";
+import { CustomCities } from "./CustomCities";
 import { t, type Locale } from "@/lib/i18n";
 
 function formatAsOf(asOf: Date, locale: Locale): string {
@@ -14,13 +15,6 @@ function formatAsOf(asOf: Date, locale: Locale): string {
 
 export async function WeatherBoard({ locale }: { locale: Locale }) {
   const { cities, asOf } = await getWeather(locale);
-  if (!cities.length) {
-    return (
-      <p className="font-mono text-[12.5px] text-ink-2 border border-line bg-panel/40 px-4 py-3 mb-10">
-        {t(locale, "weatherUnavailable")}
-      </p>
-    );
-  }
   return (
     <section className="mb-10">
       <div className="flex items-center justify-between gap-3 border-b border-line pb-2 mb-5">
@@ -32,7 +26,12 @@ export async function WeatherBoard({ locale }: { locale: Locale }) {
           {t(locale, "updated")} {formatAsOf(asOf, locale)}
         </time>
       </div>
-      <WeatherGrid cities={cities} locale={locale} />
+      {cities.length ? (
+        <WeatherGrid cities={cities} locale={locale} />
+      ) : (
+        <p className="font-mono text-[12.5px] text-ink-2 border border-line bg-panel/40 px-4 py-3">{t(locale, "weatherUnavailable")}</p>
+      )}
+      <CustomCities locale={locale} />
     </section>
   );
 }
