@@ -1,4 +1,4 @@
-// Magnus Wire — RSS → OpenAI (TR/EN/ET + bölge) → Supabase
+// MagiWire — RSS → OpenAI (TR/EN/ET + bölge) → Supabase
 import Parser from "rss-parser";
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
@@ -116,7 +116,7 @@ async function fetchOgImage(url) {
   try {
     const ctrl = new AbortController();
     const to = setTimeout(() => ctrl.abort(), 8000);
-    const res = await fetch(url, { signal: ctrl.signal, redirect: "follow", headers: { "User-Agent": "Mozilla/5.0 (compatible; MagnusWireBot/1.0; +https://news.magnusmagi.com)" } });
+    const res = await fetch(url, { signal: ctrl.signal, redirect: "follow", headers: { "User-Agent": "Mozilla/5.0 (compatible; MagiWireBot/1.0; +https://news.magnusmagi.com)" } });
     clearTimeout(to);
     if (!res.ok) return null;
     const html = (await res.text()).slice(0, 250000);
@@ -173,7 +173,7 @@ async function rewrite(item) {
 async function main() {
   for (const [k, v] of Object.entries({ SUPABASE_URL, SERVICE_ROLE, OPENAI_API_KEY })) if (!v) { log("HATA eksik env", k); process.exit(1); }
   const sb = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
-  const parser = new Parser({ timeout: 15000, headers: { "User-Agent": "Mozilla/5.0 (compatible; MagnusWireBot/1.0; +https://news.magnusmagi.com)" }, customFields: { item: [["media:content","media",{keepArray:true}],["media:thumbnail","mediaThumb"],"content:encoded"] } });
+  const parser = new Parser({ timeout: 15000, headers: { "User-Agent": "Mozilla/5.0 (compatible; MagiWireBot/1.0; +https://news.magnusmagi.com)" }, customFields: { item: [["media:content","media",{keepArray:true}],["media:thumbnail","mediaThumb"],"content:encoded"] } });
 
   const { data: existing } = await sb.from("dispatches").select("source_url,title").not("source_url", "is", null).limit(1000);
   const seen = new Set((existing || []).map((r) => r.source_url));

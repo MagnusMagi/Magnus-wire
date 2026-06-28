@@ -28,7 +28,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ locale:
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0">
   <channel>
-    <title>Magnus Wire (${locale.toUpperCase()})</title>
+    <title>MagiWire (${locale.toUpperCase()})</title>
     <link>${BASE}/${locale}</link>
     <description>Otomatik, kişisel teknoloji tel servisi — RSS + yapay zekâ.</description>
     <language>${locale}</language>

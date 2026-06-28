@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 
 test.use({ viewport: { width: 375, height: 812 } });
 
-const paths = ["/tr", "/tr/borsa", "/tr/hava", "/tr/finans"];
+const paths = ["/tr", "/tr/borsa", "/tr/hava", "/tr/deprem"];
 
 for (const path of paths) {
   test(`no horizontal overflow at 375px: ${path}`, async ({ page }) => {

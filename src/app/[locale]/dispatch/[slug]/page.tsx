@@ -60,8 +60,8 @@ export default async function DispatchPage({ params }: { params: Promise<{ local
     ...(d.hero ? { image: [d.hero] } : {}),
     datePublished: d.publishedAt,
     dateModified: d.publishedAt,
-    author: [{ "@type": "Organization", name: "Magnus Wire" }],
-    publisher: { "@type": "Organization", name: "Magnus Wire" },
+    author: [{ "@type": "Organization", name: "MagiWire" }],
+    publisher: { "@type": "Organization", name: "MagiWire" },
     articleSection: sectionLabel(d.section, locale),
     inLanguage: locale,
     mainEntityOfPage: pageUrl,
@@ -113,7 +113,7 @@ export default async function DispatchPage({ params }: { params: Promise<{ local
 
           <figure className="max-w-[920px] mx-auto my-7">
             <ArticleImage hero={d.hero} slug={d.slug} alt={d.title} ratio="aspect-[16/9]" />
-            <figcaption className="font-mono text-[11.5px] text-ink-3 mt-2 break-words">{"Foto: "}{(() => { try { return d.hero ? new URL(d.hero).hostname.replace(/^www\./, "") : "Magnus Wire"; } catch { return "Magnus Wire"; } })()}</figcaption>
+            <figcaption className="font-mono text-[11.5px] text-ink-3 mt-2 break-words">{"Foto: "}{(() => { try { return d.hero ? new URL(d.hero).hostname.replace(/^www\./, "") : "MagiWire"; } catch { return "MagiWire"; } })()}</figcaption>
           </figure>
 
           <div className="max-w-[680px] mx-auto mb-3"><AudioPlayer slug={d.slug} locale={locale} /></div>

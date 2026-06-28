@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test.describe("Magnus Wire critical flows", () => {
+test.describe("MagiWire critical flows", () => {
   test("homepage renders the wire with dispatches", async ({ page }) => {
     await page.goto("/tr");
     await expect(page.locator("h1").first()).toBeVisible();
@@ -8,10 +8,15 @@ test.describe("Magnus Wire critical flows", () => {
     await expect(links.first()).toBeVisible();
   });
 
-  test("category page loads and finance shows the market ticker", async ({ page }) => {
-    await page.goto("/tr/finans");
-    await expect(page.getByRole("heading", { level: 1 })).toContainText("Finans");
+  test("borsa page loads and shows live market data", async ({ page }) => {
+    await page.goto("/tr/borsa");
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Borsa");
     await expect(page.locator("text=/USD\\/TRY|BTC/").first()).toBeVisible({ timeout: 8000 });
+  });
+
+  test("/finans permanently redirects to /borsa", async ({ page }) => {
+    await page.goto("/tr/finans");
+    await expect(page).toHaveURL(/\/tr\/borsa$/);
   });
 
   test("dispatch detail opens from home with listen button and source", async ({ page }) => {

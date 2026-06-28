@@ -1,7 +1,7 @@
 self.addEventListener("push", (event) => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch (e) { data = {}; }
-  const title = data.title || "Magnus Wire";
+  const title = data.title || "MagiWire";
   const options = {
     body: data.body || "",
     icon: "/icon.svg",

@@ -9,7 +9,7 @@ for (const l of txt.split("\n")) { const m = l.match(/^([A-Z_]+)=(.*)$/); if (m 
 async function fetchOgImage(url) {
   try {
     const ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), 8000);
-    const res = await fetch(url, { signal: ctrl.signal, redirect: "follow", headers: { "User-Agent": "Mozilla/5.0 (compatible; MagnusWireBot/1.0; +https://news.magnusmagi.com)" } });
+    const res = await fetch(url, { signal: ctrl.signal, redirect: "follow", headers: { "User-Agent": "Mozilla/5.0 (compatible; MagiWireBot/1.0; +https://news.magnusmagi.com)" } });
     clearTimeout(to); if (!res.ok) return null;
     const html = (await res.text()).slice(0, 250000);
     const pick = (re) => { const m = html.match(re); return m ? m[1] : null; };

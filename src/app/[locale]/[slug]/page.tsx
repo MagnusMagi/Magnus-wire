@@ -4,9 +4,10 @@ import type { Metadata } from "next";
 import { allPages } from "content-collections";
 import { MDXContent } from "@content-collections/mdx/react";
 import { CatNav } from "@/components/CatNav";
-import { MarketTicker } from "@/components/MarketTicker";
 import { MarketsBoard } from "@/components/markets/MarketsBoard";
 import { WeatherBoard } from "@/components/weather/WeatherBoard";
+import { QuakeBoard } from "@/components/quake/QuakeBoard";
+import { AiPredictButton } from "@/components/quake/AiPredictButton";
 import { FollowButton } from "@/components/FollowButton";
 import { Dispatch } from "@/components/Dispatch";
 import { mdxComponents } from "@/components/mdx";
@@ -43,10 +44,11 @@ export default async function SlugPage({ params }: { params: Promise<{ locale: s
   if (isTopic || isRegion) {
     const isBorsa = slug === "borsa";
     const isHava = slug === "hava";
-    // Borsa: piyasa panosu + finans haberleri. Hava: yalnızca hava panosu (haber yok).
+    const isDeprem = slug === "deprem";
+    // Borsa: piyasa panosu + finans haberleri. Hava/Deprem: yalnızca pano (haber yok).
     const list = isBorsa
       ? await dispatchesBySection(locale, "finans")
-      : isHava
+      : isHava || isDeprem
         ? []
         : isTopic
           ? await dispatchesBySection(locale, slug)
@@ -55,7 +57,7 @@ export default async function SlugPage({ params }: { params: Promise<{ locale: s
     return (
       <>
         <CatNav locale={locale} active={slug} />
-        <main className="mx-auto max-w-[1240px] px-6 pt-9 pb-18">
+        <main className="mx-auto w-full max-w-[1240px] px-6 pt-9 pb-18">
           <header className="border-b-2 border-ink pb-4 mb-2">
             <span className="font-mono text-[11px] font-bold uppercase tracking-widest text-wire">
               {t(locale, isRegion ? "regionWord" : "sectionWord")}
@@ -64,19 +66,22 @@ export default async function SlugPage({ params }: { params: Promise<{ locale: s
               <h1 className="font-serif text-[clamp(32px,1.8rem+2vw,48px)] font-black tracking-tight leading-none">
                 {sectionLabel(slug, locale)}
               </h1>
-              <FollowButton slug={slug} locale={locale} />
+              <div className="flex flex-wrap items-center gap-2">
+                {isDeprem && <AiPredictButton locale={locale} />}
+                <FollowButton slug={slug} locale={locale} />
+              </div>
             </div>
           </header>
-          {slug === "finans" && <MarketTicker locale={locale} />}
           {isBorsa && <MarketsBoard locale={locale} />}
           {isHava && <WeatherBoard locale={locale} />}
+          {isDeprem && <QuakeBoard locale={locale} />}
           {isBorsa && list.length > 0 && (
             <h2 className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-wire border-b border-line pb-2 mb-4">
               {t(locale, "marketNews")}
             </h2>
           )}
           {list.length === 0 ? (
-            !isBorsa && !isHava && <p className="font-mono text-ink-2 py-10">{t(locale, "emptySection")}</p>
+            !isBorsa && !isHava && !isDeprem && <p className="font-mono text-ink-2 py-10">{t(locale, "emptySection")}</p>
           ) : (
             <ul className="m-0 p-0 list-none max-w-[820px]">
               {list.map((d, i) => (
@@ -109,7 +114,7 @@ export default async function SlugPage({ params }: { params: Promise<{ locale: s
         <div className="wire-prose max-w-[680px] mx-auto">
           {page.updated && <p className="font-mono text-[11.5px] text-ink-3 mb-6">{page.updated}</p>}
           <MDXContent code={page.body} components={mdxComponents} />
-          {slug === "iletisim" && <ContactForm />}
+          {slug === "iletisim" && <ContactForm locale={locale} />}
         </div>
       </main>
     </>

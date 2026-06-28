@@ -16,7 +16,7 @@ export async function GET(req: Request) {
   try {
     const ctrl = new AbortController();
     const to = setTimeout(() => ctrl.abort(), 8000);
-    const r = await fetch(target, { signal: ctrl.signal, redirect: "follow", headers: { "User-Agent": "Mozilla/5.0 (compatible; MagnusWireBot/1.0; +https://news.magnusmagi.com)" } });
+    const r = await fetch(target, { signal: ctrl.signal, redirect: "follow", headers: { "User-Agent": "Mozilla/5.0 (compatible; MagiWireBot/1.0; +https://news.magnusmagi.com)" } });
     clearTimeout(to);
     if (!r.ok) return new Response("upstream", { status: 502 });
     const ct = r.headers.get("content-type") || "";

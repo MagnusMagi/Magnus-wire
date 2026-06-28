@@ -1,6 +1,6 @@
 <div align="center">
 
-# 📡 Magnus Wire
+# 📡 MagiWire
 
 ### AI‑destekli, çok dilli (🇹🇷 / 🇬🇧 / 🇪🇪) teknoloji & gündem haber teli
 
@@ -58,7 +58,7 @@
 
 ## 🌍 Genel Bakış
 
-**Magnus Wire**, klasik bir "haber CMS"i değildir. Bir **otomasyon hattıdır**: belirlenen RSS kaynaklarını yarım saatte bir tarar, her haberi OpenAI ile **özgün, üç dilli, en az 3 paragraflık** bir yazıya dönüştürür, görselini kaynaktan crawl'lar, anahtar gerçekleri (key facts) çıkarır ve self‑hosted Supabase'e yazar. Site tarafı Next.js 16 App Router üzerinde **ISR** ile statik hızında ama taze içerikle yayınlanır.
+**MagiWire**, klasik bir "haber CMS"i değildir. Bir **otomasyon hattıdır**: belirlenen RSS kaynaklarını yarım saatte bir tarar, her haberi OpenAI ile **özgün, üç dilli, en az 3 paragraflık** bir yazıya dönüştürür, görselini kaynaktan crawl'lar, anahtar gerçekleri (key facts) çıkarır ve self‑hosted Supabase'e yazar. Site tarafı Next.js 16 App Router üzerinde **ISR** ile statik hızında ama taze içerikle yayınlanır.
 
 > **Tasarım dili — "Canlı Tel / Dispatch":** Menlo monospace (makine sesi) + Fraunces serif (editör sesi) ikilisi, zaman omurgası imzası ve teal/amber iki‑renk paleti. Şablon görünümünden kaçınan, redaksiyon estetiğinde editöryel bir arayüz.
 

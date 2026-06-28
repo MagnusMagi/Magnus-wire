@@ -1,6 +1,6 @@
-# 🤝 Magnus Wire'a Katkı Rehberi
+# 🤝 MagiWire'a Katkı Rehberi
 
-Magnus Wire'a ilgin için teşekkürler! Bu, AI ile çalışan çok dilli bir haber teli. Aşağıdaki rehber, ortamı kurmandan PR açmana kadar süreci özetler.
+MagiWire'a ilgin için teşekkürler! Bu, AI ile çalışan çok dilli bir haber teli. Aşağıdaki rehber, ortamı kurmandan PR açmana kadar süreci özetler.
 
 > Kişisel bir hobi projesi olduğu için süreç hafif tutulmuştur — ama kod kalitesi, güvenlik ve çok dillilik konusunda titizdir.
 

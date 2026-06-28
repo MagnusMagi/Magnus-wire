@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const UA = "Mozilla/5.0 (compatible; MagnusWireBot/1.0; +https://news.magnusmagi.com)";
+const UA = "Mozilla/5.0 (compatible; MagiWireBot/1.0; +https://news.magnusmagi.com)";
 
 export async function GET(req: NextRequest) {
   const q = (req.nextUrl.searchParams.get("q") || "").trim();

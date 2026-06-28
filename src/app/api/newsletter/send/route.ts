@@ -57,12 +57,12 @@ export async function POST(req: Request) {
       if (!all.length) continue;
       const items = all.map((d) => ({ slug: d.slug, title: d.title, summary: (d.summary || "").slice(0, 180) }));
       const html = digestHtml(lc, items);
-      const subject = lc === "en" ? "Magnus Wire — daily wire" : lc === "et" ? "Magnus Wire — päevauudised" : "Magnus Wire — günlük tel";
+      const subject = lc === "en" ? "MagiWire — daily wire" : lc === "et" ? "MagiWire — päevauudised" : "MagiWire — günlük tel";
       const personalizations = emails.map((e) => ({ to: [{ email: e }] }));
       const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ personalizations, from: { email: from, name: "Magnus Wire" }, subject, content: [{ type: "text/html", value: html }] }),
+        body: JSON.stringify({ personalizations, from: { email: from, name: "MagiWire" }, subject, content: [{ type: "text/html", value: html }] }),
       });
       if (res.ok) sent += emails.length;
     }

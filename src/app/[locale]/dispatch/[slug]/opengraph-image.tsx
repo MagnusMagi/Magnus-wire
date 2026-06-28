@@ -5,13 +5,13 @@ import { isLocale, type Locale } from "@/lib/i18n";
 
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
-export const alt = "Magnus Wire";
+export const alt = "MagiWire";
 
 export default async function OgImage({ params }: { params: Promise<{ locale: string; slug: string }> }) {
   const { locale: raw, slug } = await params;
   const locale = (isLocale(raw) ? raw : "tr") as Locale;
   const d = await getDispatch(locale, slug);
-  const title = (d?.title || "Magnus Wire").slice(0, 140);
+  const title = (d?.title || "MagiWire").slice(0, 140);
   const section = d ? sectionLabel(d.section, locale).toUpperCase() : "DISPATCH";
   const region = d?.region ? sectionLabel(d.region, locale).toUpperCase() : "";
   return new ImageResponse(

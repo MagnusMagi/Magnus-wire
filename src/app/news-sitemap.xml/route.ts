@@ -11,7 +11,7 @@ export async function GET() {
   const urls = recent.map((d) => `  <url>
     <loc>${BASE}/tr/dispatch/${d.slug}</loc>
     <news:news>
-      <news:publication><news:name>Magnus Wire</news:name><news:language>tr</news:language></news:publication>
+      <news:publication><news:name>MagiWire</news:name><news:language>tr</news:language></news:publication>
       <news:publication_date>${new Date(d.publishedAt).toISOString()}</news:publication_date>
       <news:title>${esc(d.title)}</news:title>
     </news:news>
