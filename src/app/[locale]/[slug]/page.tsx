@@ -15,6 +15,7 @@ import { ContactForm } from "@/components/ContactForm";
 import { dispatchesBySection, dispatchesByRegion, agoLabel, latestTs } from "@/lib/dispatches";
 import { TOPIC_SLUGS, REGION_SLUGS, sectionLabel } from "@/lib/site";
 import { LOCALES, t, isLocale, type Locale } from "@/lib/i18n";
+import { SITE_URL, altLanguages } from "@/lib/seo";
 
 export const revalidate = 3600;
 
@@ -26,11 +27,12 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: { params: Promise<{ locale: string; slug: string }> }): Promise<Metadata> {
   const { locale: raw, slug } = await params;
   const locale = (isLocale(raw) ? raw : "tr") as Locale;
+  const alternates = { canonical: `${SITE_URL}/${locale}/${slug}`, languages: altLanguages(`/${slug}`) };
   if (TOPIC_SLUGS.includes(slug) || REGION_SLUGS.includes(slug)) {
-    return { title: sectionLabel(slug, locale) };
+    return { title: sectionLabel(slug, locale), alternates };
   }
   const page = allPages.find((p) => p.slug === slug);
-  if (page) return { title: page.title, description: page.summary };
+  if (page) return { title: page.title, description: page.summary, alternates };
   return {};
 }
 

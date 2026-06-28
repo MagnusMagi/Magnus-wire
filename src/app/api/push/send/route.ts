@@ -7,6 +7,16 @@ import type { Locale } from "@/lib/i18n";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+// Push payload URL'i yalnızca kendi sitemize ait https olabilir (phishing/javascript: engeli).
+function safeUrl(u: string | undefined): string | undefined {
+  if (!u) return undefined;
+  try {
+    const p = new URL(u);
+    if (p.protocol === "https:" && (u === SITE_URL || u.startsWith(`${SITE_URL}/`))) return u;
+  } catch { /* geçersiz URL */ }
+  return undefined;
+}
+
 export async function POST(req: Request) {
   const secret = process.env.NEWSLETTER_SECRET;
   if (!secret || req.headers.get("x-newsletter-secret") !== secret)
@@ -24,7 +34,7 @@ export async function POST(req: Request) {
   // If no explicit payload, push the latest breaking (live) dispatch.
   let title = body.title;
   let bodyText = body.bodyText || "";
-  let url = body.url;
+  let url = safeUrl(body.url);
   if (!title) {
     const latest = await getDispatches("tr" as Locale, 20);
     const pick = latest.find((d) => d.live) || latest[0];
