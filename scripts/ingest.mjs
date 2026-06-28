@@ -38,12 +38,13 @@ const FEED_LIST = [
   { url: "https://www.bleepingcomputer.com/feed/", section: "siber" },
   { url: "https://dev.to/feed", section: "yazilim" },
   { url: "https://www.sciencedaily.com/rss/all.xml", section: "bilim" },
-  { url: "https://www.eu-startups.com/feed/", region: "avrupa", section: "girisim" },
+  { url: "https://www.eu-startups.com/feed/", region: "avrupa", section: "finans" },
   { url: "https://feeds.bbci.co.uk/news/business/rss.xml", section: "finans" },
   { url: "https://shiftdelete.net/feed", region: "turkiye" },
   { url: "https://news.err.ee/rss", region: "estonya" },
+  { url: "https://www.err.ee/rss", region: "estonya" },               // ERR Estonca ana akış (öne çıkan/top haberler)
   { url: "https://www.theverge.com/rss/index.xml" },
-  { url: "https://webrazzi.com/feed/", region: "turkiye", section: "girisim" },
+  { url: "https://webrazzi.com/feed/", region: "turkiye", section: "finans" },
   { url: "https://tehnika.postimees.ee/rss", region: "estonya" },
 
   // ── 2. tur: ikinci kaynaklar ──
@@ -52,7 +53,7 @@ const FEED_LIST = [
   { url: "https://feeds.feedburner.com/TheHackersNews", section: "siber" },
   { url: "https://github.blog/feed/", section: "yazilim" },
   { url: "https://www.newscientist.com/feed/home/", section: "bilim" },
-  { url: "https://techcrunch.com/category/startups/feed/", section: "girisim" },
+  { url: "https://techcrunch.com/category/startups/feed/", section: "finans" },
   { url: "https://www.bloomberght.com/rss", region: "turkiye", section: "finans" },
   { url: "https://www.webtekno.com/rss.xml", region: "turkiye" },
   { url: "https://feeds.bbci.co.uk/news/world/rss.xml", section: "gundem" },
@@ -63,13 +64,14 @@ const FEED_LIST = [
   { url: "https://www.dunya.com/rss", region: "turkiye", section: "finans" },
   { url: "https://www.donanimhaber.com/rss/tum/", region: "turkiye" },
   { url: "https://news.postimees.ee/rss", region: "estonya" },
+  { url: "https://www.postimees.ee/rss", region: "estonya" },
 
   // ── 3. tur: üçüncü kaynaklar / derinlik ──
   { url: "https://decrypt.co/feed", section: "kripto" },
   { url: "https://phys.org/rss-feed/space-news/", section: "uzay" },
   { url: "https://krebsonsecurity.com/feed/", section: "siber" },
   { url: "https://phys.org/rss-feed/", section: "bilim" },
-  { url: "https://sifted.eu/feed", region: "avrupa", section: "girisim" },
+  { url: "https://sifted.eu/feed", region: "avrupa", section: "finans" },
   { url: "https://hnrss.org/frontpage" },
   { url: "https://www.engadget.com/rss.xml" },
   { url: "https://www.trthaber.com/manset_articles.rss", region: "turkiye", section: "gundem" },
@@ -90,7 +92,7 @@ const FEEDS = process.env.INGEST_FEEDS
   ? process.env.INGEST_FEEDS.split(",").map((s) => ({ url: s.trim() })).filter((f) => f.url)
   : FEED_LIST;
 
-const TOPICS = { "gundem": "Gündem", "finans": "Finans", "yapay-zeka": "Yapay Zeka", "yazilim": "Yazılım", "donanim": "Donanım", "bilim": "Bilim", "girisim": "Girişim", "kripto": "Kripto", "siber": "Siber", "uzay": "Uzay" };
+const TOPICS = { "gundem": "Gündem", "finans": "Finans", "yapay-zeka": "Yapay Zeka", "yazilim": "Yazılım", "donanim": "Donanım", "bilim": "Bilim", "kripto": "Kripto", "siber": "Siber", "uzay": "Uzay" };
 const REGIONS = new Set(["estonya", "turkiye", "avrupa", "abd"]);
 
 function log(...a) { console.log(new Date().toISOString(), ...a); }
