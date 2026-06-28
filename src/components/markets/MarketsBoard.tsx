@@ -1,20 +1,17 @@
 import { getMarketGroups } from "@/lib/markets";
 import { MarketsGrid } from "./MarketsGrid";
 import { MoversStrip } from "./MoversStrip";
+import { WatchlistSection } from "./WatchlistSection";
 import { t, type Locale } from "@/lib/i18n";
 
 const GROUP_KEY: Record<string, string> = {
-  indices: "grpIndices",
-  fx: "grpFx",
-  commodities: "grpCommodities",
-  crypto: "grpCrypto",
+  indices: "grpIndices", fx: "grpFx", commodities: "grpCommodities", crypto: "grpCrypto",
 };
 
 function formatAsOf(asOf: Date, locale: Locale): string {
   try {
     return new Intl.DateTimeFormat(locale === "tr" ? "tr-TR" : locale === "et" ? "et-EE" : "en-GB", {
-      hour: "2-digit", minute: "2-digit", hour12: false,
-      timeZone: "Europe/Istanbul", timeZoneName: "short",
+      hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Istanbul", timeZoneName: "short",
     }).format(asOf);
   } catch {
     return asOf.toISOString().slice(11, 16) + " UTC";
@@ -43,6 +40,7 @@ export async function MarketsBoard({ locale }: { locale: Locale }) {
         </time>
       </div>
 
+      <WatchlistSection quotes={allQuotes} locale={locale} />
       <MoversStrip quotes={allQuotes} locale={locale} />
 
       {groups.map((g) => (
