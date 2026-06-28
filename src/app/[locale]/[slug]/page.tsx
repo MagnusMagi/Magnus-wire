@@ -42,12 +42,15 @@ export default async function SlugPage({ params }: { params: Promise<{ locale: s
   // Kategori (konu veya bölge)
   if (isTopic || isRegion) {
     const isBorsa = slug === "borsa";
-    // Borsa: özel piyasa panosu + altında piyasa (finans) haberleri.
+    const isHava = slug === "hava";
+    // Borsa: piyasa panosu + finans haberleri. Hava: yalnızca hava panosu (haber yok).
     const list = isBorsa
       ? await dispatchesBySection(locale, "finans")
-      : isTopic
-        ? await dispatchesBySection(locale, slug)
-        : await dispatchesByRegion(locale, slug);
+      : isHava
+        ? []
+        : isTopic
+          ? await dispatchesBySection(locale, slug)
+          : await dispatchesByRegion(locale, slug);
     const anchor = latestTs(list);
     return (
       <>
@@ -66,14 +69,14 @@ export default async function SlugPage({ params }: { params: Promise<{ locale: s
           </header>
           {slug === "finans" && <MarketTicker locale={locale} />}
           {isBorsa && <MarketsBoard locale={locale} />}
-          {isBorsa && <WeatherBoard locale={locale} />}
+          {isHava && <WeatherBoard locale={locale} />}
           {isBorsa && list.length > 0 && (
             <h2 className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-wire border-b border-line pb-2 mb-4">
               {t(locale, "marketNews")}
             </h2>
           )}
           {list.length === 0 ? (
-            !isBorsa && <p className="font-mono text-ink-2 py-10">{t(locale, "emptySection")}</p>
+            !isBorsa && !isHava && <p className="font-mono text-ink-2 py-10">{t(locale, "emptySection")}</p>
           ) : (
             <ul className="m-0 p-0 list-none max-w-[820px]">
               {list.map((d, i) => (
