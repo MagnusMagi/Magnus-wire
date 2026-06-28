@@ -49,7 +49,7 @@ export default async function DispatchPage({ params }: { params: Promise<{ local
     .slice(0, 3)
     .map((s) => s.x);
   const initials = sectionLabel(d.section, locale).slice(0, 2).toUpperCase();
-  const pageUrl = `https://news.magnusmagi.com/${locale}/dispatch/${d.slug}`;
+  const pageUrl = `${SITE_URL}/${locale}/dispatch/${d.slug}`;
   let srcHost = "";
   try { if (d.sourceUrl) srcHost = new URL(d.sourceUrl).hostname.replace(/^www\./, ""); } catch {}
   const ld = {
@@ -79,7 +79,7 @@ export default async function DispatchPage({ params }: { params: Promise<{ local
           <span className="mx-[7px] text-line">›</span>
           <Link href={`/${locale}/${d.section}`} className="text-wire">{sectionLabel(d.section, locale)}</Link>
           <span className="mx-[7px] text-line">›</span>
-          <span className="text-ink-2">{d.slug}</span>
+          <span className="text-ink-2">{d.title}</span>
         </nav>
 
         <article>
@@ -113,7 +113,7 @@ export default async function DispatchPage({ params }: { params: Promise<{ local
 
           <figure className="max-w-[920px] mx-auto my-7">
             <ArticleImage hero={d.hero} slug={d.slug} alt={d.title} ratio="aspect-[16/9]" />
-            <figcaption className="font-mono text-[11.5px] text-ink-3 mt-2 break-words">{"Foto: "}{(() => { try { return d.hero ? new URL(d.hero).hostname.replace(/^www\./, "") : "MagiWire"; } catch { return "MagiWire"; } })()}</figcaption>
+            <figcaption className="font-mono text-[11.5px] text-ink-3 mt-2 break-words">{t(locale, "photoBy")}{" "}{(() => { try { return d.hero ? new URL(d.hero).hostname.replace(/^www\./, "") : "MagiWire"; } catch { return "MagiWire"; } })()}</figcaption>
           </figure>
 
           <div className="max-w-[680px] mx-auto mb-3"><AudioPlayer slug={d.slug} locale={locale} /></div>

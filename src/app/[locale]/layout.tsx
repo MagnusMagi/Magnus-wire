@@ -36,7 +36,7 @@ export default async function LocaleLayout({
         <Masthead locale={locale} />
         {children}
         <Footer locale={locale} />
-        <ScrollTop />
+        <ScrollTop locale={locale} />
         <KeyboardShortcuts />
       </body>
     </html>

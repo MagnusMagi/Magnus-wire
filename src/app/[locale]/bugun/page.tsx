@@ -32,7 +32,7 @@ export default async function TodayPage({ params }: { params: Promise<{ locale: 
         <header className="border-b-2 border-ink pb-4 mb-2">
           <span className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-signal">{t(locale, "todaySub")}</span>
           <h1 className="font-serif font-black tracking-tight text-[clamp(38px,2.2rem+2vw,64px)] leading-[0.92] mt-1">{t(locale, "todayTitle")}</h1>
-          <p className="font-mono text-[12.5px] text-ink-3 mt-2.5">{today.length} dispatch · {groups.length} {t(locale, "sectionWord").toLowerCase()}</p>
+          <p className="font-mono text-[12.5px] text-ink-3 mt-2.5">{today.length} {t(locale, "dispatchWord")} · {groups.length} {t(locale, "sectionWord").toLowerCase()}</p>
         </header>
 
         {today.length === 0 ? (

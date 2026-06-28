@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { CatNav } from "@/components/CatNav";
 import { SourceLink } from "@/components/SourceLink";
 import { t, isLocale, type Locale } from "@/lib/i18n";
 
@@ -24,6 +25,8 @@ export default function FeedPage() {
   }, [locale]);
 
   return (
+    <>
+    <CatNav locale={locale} active="akis" />
     <main className="mx-auto max-w-[1240px] px-6 pt-9 pb-18">
       <header className="border-b-2 border-ink pb-4 mb-5">
         <span className="font-mono text-[11px] font-bold uppercase tracking-widest text-wire">{t(locale, "feedKicker")}</span>
@@ -58,5 +61,6 @@ export default function FeedPage() {
         </ul>
       )}
     </main>
+    </>
   );
 }

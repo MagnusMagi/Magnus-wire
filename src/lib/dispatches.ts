@@ -86,9 +86,10 @@ export async function searchDispatches(locale: Locale, opts: { q?: string; tag?:
   const sb = supabaseServer();
   let query = sb.from("dispatches").select(COLS).order("published_at", { ascending: false }).limit(60);
   const tag = (opts.tag || "").toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 40);
-  const q = (opts.q || "").slice(0, 60).replace(/[(),%*:\\]/g, " ").trim();
+  const q = (opts.q || "").slice(0, 60).replace(/[(),%*:\\"]/g, " ").trim();
   if (tag) query = query.contains("tags", [tag]);
-  else if (q) query = query.or(`title.ilike.%${q}%,summary.ilike.%${q}%,body.ilike.%${q}%`);
+  // Değerleri çift tırnağa alıyoruz; q'dan virgül/parantez/tırnak vb. zaten temizlendi (PostgREST filtre enjeksiyon koruması).
+  else if (q) query = query.or(`title.ilike."%${q}%",summary.ilike."%${q}%",body.ilike."%${q}%"`);
   else return [];
   const { data, error } = await query;
   if (error) { console.error("searchDispatches:", error.message); return []; }

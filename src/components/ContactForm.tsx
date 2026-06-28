@@ -43,7 +43,7 @@ export function ContactForm({ locale }: { locale: Locale }) {
             className="font-mono text-sm px-3.5 py-2.5 border border-line bg-[#fbfaf6] text-ink outline-none focus:border-ink" />
           <label htmlFor="eposta" className="font-mono text-[11px] font-bold uppercase tracking-wide">{t(locale, "contactEmail")}</label>
           <input id="eposta" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} maxLength={160}
-            placeholder="ornek@eposta.com"
+            placeholder={t(locale, "contactEmailPh")}
             className="font-mono text-sm px-3.5 py-2.5 border border-line bg-[#fbfaf6] text-ink outline-none focus:border-ink" />
           <label htmlFor="mesaj" className="font-mono text-[11px] font-bold uppercase tracking-wide">{t(locale, "contactMsg")}</label>
           <textarea id="mesaj" required value={message} onChange={(e) => setMessage(e.target.value)} maxLength={4000}
