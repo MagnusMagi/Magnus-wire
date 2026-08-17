@@ -82,7 +82,16 @@ a { color: inherit; text-decoration: none; }
 
 /* Mobil yatay taşma koruması: uzun bölünemeyen string'ler (URL vb.) sayfayı kaydırmasın */
 html, body { overflow-x: clip; max-width: 100%; }
-img, svg, video { max-width: 100%; height: auto; }
+
+/* ⚠️ @layer base ŞART. Bu kural katmansız yazılıydı ve Tailwind v4'te
+   KATMANSIZ CSS, KATMANLI utility'leri YENER → `height: auto` her görselde
+   `h-full`'ü eziyordu. Sonuç: ArticleImage'in aspect-[4/3] çerçevesi 280px
+   yüksekken görsel 209px'te kalıyor, altında boş şerit oluşuyordu (ölçüldü).
+   Katmana alınınca utility'ler yine kazanıyor, taşma kalkanı da duruyor. */
+@layer base {
+  img, svg, video { max-width: 100%; height: auto; }
+}
+
 .wire-prose { overflow-wrap: break-word; }
 
 /* iOS güvenli alan dolgusu KALDIRILDI: viewport-fit=cover ile birlikte
