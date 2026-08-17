@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: "news",
-      cwd: "/home/ubuntu/news-app/.next/standalone",
+      cwd: "/home/ubuntu/apps/news-app/.next/standalone",
       script: "server.js",
       env: {
         NODE_ENV: "production",
