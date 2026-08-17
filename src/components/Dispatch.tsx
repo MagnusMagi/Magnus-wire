@@ -17,9 +17,9 @@ export function Dispatch({ d, ago, index, locale }: { d: D; ago: string; index: 
         <span className={`font-mono text-[11px] font-bold tracking-widest uppercase ${d.live ? "text-signal" : "text-wire"}`}>
           {sectionLabel(d.section, locale)}{d.region ? ` · ${sectionLabel(d.region, locale)}` : ""}
         </span>
-        <h3 className="font-serif text-[23px] leading-tight font-semibold tracking-tight my-[6px]">
+        <h2 className="font-serif text-[23px] leading-tight font-semibold tracking-tight my-[6px]">
           <Link href={`/${locale}/dispatch/${d.slug}`} className="hover:text-signal">{d.title}</Link>
-        </h3>
+        </h2>
         <p className="text-ink-2 text-[13.5px] m-0 max-w-[60ch]">{d.summary}</p>
         <SourceLink url={d.sourceUrl} name={d.sourceName} locale={locale} compact />
       </div>

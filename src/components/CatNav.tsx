@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { NEWS_TOPICS, REGIONS, DASHBOARDS } from "@/lib/site";
+import { NEWS_TOPICS, REGIONS, DASHBOARDS, EXTRA_PANELS } from "@/lib/site";
 import { t, type Locale } from "@/lib/i18n";
 
 /**
@@ -75,7 +75,7 @@ export function CatNav({ locale, active = "akis" }: { locale: Locale; active?: s
           {REGIONS.map((r) => chip(r.slug, r.label[locale]))}
           <li aria-hidden className="flex-none w-2" />
           {groupLabel(t(locale, "panelsLabel"))}
-          {DASHBOARDS.map((d) => chip(d.slug, d.label[locale]))}
+          {[...DASHBOARDS, ...EXTRA_PANELS].map((d) => chip(d.slug, d.label[locale]))}
           <li aria-hidden className="flex-none w-3" />
         </ul>
       </div>

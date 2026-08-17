@@ -68,6 +68,13 @@ export const DASHBOARDS: Section[] = TOPICS.filter((s) =>
   DASHBOARD_SLUGS.includes(s.slug as (typeof DASHBOARD_SLUGS)[number]),
 );
 
+// Nav'ın PANO grubunda görünen ama içerik BÖLÜMÜ olmayan sayfalar.
+// TOPICS'e eklenmiyor: ingest oraya haber sınıflandırmamalı, /[slug] rotası da
+// bunları kategori sanmamalı — yalnız sunum katmanında görünürler.
+export const EXTRA_PANELS: Section[] = [
+  { slug: "hikayeler", kind: "topic", label: { tr: "Hikayeler", en: "Stories", et: "Lood" } },
+];
+
 export const ALL_SECTIONS: Section[] = [...TOPICS, ...REGIONS, ...CONTENT_SECTIONS];
 export const TOPIC_SLUGS = TOPICS.map((s) => s.slug);
 export const REGION_SLUGS = REGIONS.map((s) => s.slug);
