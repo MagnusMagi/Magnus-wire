@@ -58,16 +58,22 @@ const EUROPE = new Set([
   "United Kingdom",
 ]);
 
-// "Genel" = bölgesiz global kaynak; "Dünya" = dünya haberleri → ikisi de
-// bölge zorlamaz (AI habere göre karar verir).
-const NO_REGION = new Set(["Genel", "Dünya"]);
+// "Genel" ve "Dünya" başlıkları belirli bir ülkenin yayını değil, küresel
+// kaynaklar. Ülke olarak "Global" işaretlenirler (null DEĞİL): ingest bu bilgiyi
+// AI'ya ipucu veriyor ve "ülkesi bilinmiyor" ile "küresel yayın" farklı şeyler.
+const GLOBAL_SCOPE = new Set(["Genel", "Dünya"]);
 
+export function mapCountry(country) {
+  return !country || GLOBAL_SCOPE.has(country) ? "Global" : country;
+}
+
+// Bölge burada YEDEK üretir, zorlama değil: ingest önce AI'nın haber içeriğinden
+// çıkardığı bölgeye bakar, yalnız o kararsız kalınca buraya düşer.
 export function mapRegion(country) {
-  if (!country || NO_REGION.has(country)) return null;
   if (REGION_EXACT[country]) return REGION_EXACT[country];
   if (EUROPE.has(country)) return "avrupa";
-  // Kalan 28 ülke (India, Philippines, Mexico, Australia...) için ayrı sayfa yok;
-  // hepsi "dunya" bölgesine düşer, ülke adı etiket olarak korunur.
+  // Küresel kaynaklar ve kendi sayfası olmayan 28 ülke (India, Philippines,
+  // Mexico, Australia...) "dunya" bölgesine düşer; ülke adı etiket olarak kalır.
   return "dunya";
 }
 
@@ -103,7 +109,7 @@ export function parseSourcesMarkdown(text) {
       category: category ?? null,
       section: mapSection(category),
       region: mapRegion(country),
-      country: NO_REGION.has(country) ? null : country,
+      country: mapCountry(country),
       lang: lang.trim(),
       active: mark === "✅",
     });

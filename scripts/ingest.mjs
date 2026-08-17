@@ -118,7 +118,7 @@ function isFresh(item) {
 }
 function shortHash(s) { let h = 0; for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0; return Math.abs(h).toString(36).slice(0, 6); }
 
-async function rewrite(item) {
+async function rewrite(item, source = {}) {
   // Gövde YALNIZ Türkçe üretilir. EN/ET için sadece başlık + spot istenir:
   // liste/kategori/arama sayfaları ve sitemap üç dilde anlamlı kalsın diye.
   // EN/ET gövdesi, biri o dildeki habere gerçekten girdiğinde çevrilip
@@ -132,7 +132,15 @@ async function rewrite(item) {
   const snippet = (item.contentSnippet || item["content:encoded"] || item.content || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 2500);
   const bodyRule = "EN AZ 3 dolu paragraf (her paragraf 3-5 cümle, toplam ≥250 kelime). Markdown; gerekirse bir ## ara başlık. Bağlam, arka plan ve olası etkileri açıkla — yüzeysel özet GEÇME.";
   const factsRule = "haberin 3-5 kilit gerçeği / öne çıkan noktası; her madde tek kısa cümle, somut (sayı/isim/tarih varsa kullan)";
-  const user = `Kaynak başlık: ${item.title}\nKaynak metin: ${snippet}\n\nGövdeyi SADECE Türkçe yaz. "en" ve "et" için yalnızca başlık ve spot'un çevirisini ver — gövde YAZMA. SADECE şu JSON'u döndür:\n{\n "section": "şunlardan biri: ${Object.keys(TOPICS).join(", ")}",\n "region": "şunlardan biri ya da boş: estonya, turkiye, avrupa, abd",\n "tags": ["2-4 küçük harf etiket"],\n "tr": {"title":"≤90 karakter", "summary":"tek cümle spot", "body":"${bodyRule}", "keyFacts":["ZORUNLU, 3-5 madde — ${factsRule}"]},\n "en": {"title":"tr.title'ın İngilizcesi", "summary":"tr.summary'nin İngilizcesi"},\n "et": {"title":"tr.title'ın Estoncası", "summary":"tr.summary'nin Estoncası"}\n}`;
+  // Kaynağın ülkesi AI'ya BAĞLAM olarak verilir, cevap olarak değil.
+  // Zorlama modelinde kaynağın ülkesi doğrudan bölge oluyordu ve Türk
+  // gazetesinin "Belçika'da orman yangını" haberi `turkiye` etiketi alıyordu.
+  // Şimdi karar içerikten veriliyor; ülke yalnız bağlam sağlıyor (örn. "obruk"
+  // haberinin Türkiye'yle ilgili olduğunu anlamak için).
+  const originLine = source.country && source.country !== "Global"
+    ? `Bu kaynak ${source.country} yayınıdır. Bu YALNIZCA bağlamdır — bölgeyi haberin KONUSUNA göre seç, kaynağın ülkesini otomatik kopyalama. Haber başka bir ülkeyi anlatıyorsa o ülkenin bölgesini yaz.`
+    : `Bu kaynak küresel bir yayındır; bölgeyi haberin konusundan çıkar.`;
+  const user = `Kaynak: ${source.name || item.title}\n${originLine}\n\nKaynak başlık: ${item.title}\nKaynak metin: ${snippet}\n\nGövdeyi SADECE Türkçe yaz. "en" ve "et" için yalnızca başlık ve spot'un çevirisini ver — gövde YAZMA. SADECE şu JSON'u döndür:\n{\n "section": "şunlardan biri: ${Object.keys(TOPICS).join(", ")}",\n "region": "şunlardan TAM BİRİ: estonya (Estonya), turkiye (Türkiye), avrupa (Avrupa ülkeleri), abd (ABD), dunya (BUNLARIN DIŞINDAKİ HER YER — Avustralya, Japonya, Hindistan, Brezilya, Çin, Orta Doğu, Afrika ve küresel/ülkesiz haberler)",\n "tags": ["2-4 küçük harf etiket"],\n "tr": {"title":"≤90 karakter", "summary":"tek cümle spot", "body":"${bodyRule}", "keyFacts":["ZORUNLU, 3-5 madde — ${factsRule}"]},\n "en": {"title":"tr.title'ın İngilizcesi", "summary":"tr.summary'nin İngilizcesi"},\n "et": {"title":"tr.title'ın Estoncası", "summary":"tr.summary'nin Estoncası"}\n}`;
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_API_KEY}` },
@@ -333,7 +341,7 @@ async function main() {
     try {
       if (forcedSection && SECTION_CAPS[forcedSection] != null && secCount[forcedSection] >= SECTION_CAPS[forcedSection]) { skips.kota++; continue; }
       attempts++;
-      const o = await rewrite(item);
+      const o = await rewrite(item, { country, name: feedTitle });
       // Bölge zorlaması artık YEDEK, override DEĞİL.
       // Zorlama kaynağın ülkesini haberin konusu sanıyordu: Türk gazetesinin
       // "Belçika'da dev orman yangını" haberi `turkiye` etiketi alıyordu.
