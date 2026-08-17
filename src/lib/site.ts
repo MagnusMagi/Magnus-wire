@@ -9,18 +9,28 @@ export interface Section {
   label: Record<Locale, string>;
 }
 
+// Nav sırası: önce haber/teknoloji çekirdeği, sonra ilgi alanları, en sonda
+// canlı-veri panoları (borsa/hava/deprem — bunlar haber listesi değil).
 export const TOPICS: Section[] = [
   { slug: "gundem", kind: "topic", label: { tr: "Gündem", en: "Headlines", et: "Päevakaja" } },
   { slug: "yapay-zeka", kind: "topic", label: { tr: "Yapay Zeka", en: "AI", et: "Tehisintellekt" } },
   { slug: "yazilim", kind: "topic", label: { tr: "Yazılım", en: "Software", et: "Tarkvara" } },
   { slug: "donanim", kind: "topic", label: { tr: "Donanım", en: "Hardware", et: "Riistvara" } },
+  { slug: "girisim", kind: "topic", label: { tr: "Girişim", en: "Startups", et: "Idufirmad" } },
   { slug: "bilim", kind: "topic", label: { tr: "Bilim", en: "Science", et: "Teadus" } },
+  { slug: "uzay", kind: "topic", label: { tr: "Uzay", en: "Space", et: "Kosmos" } },
+  { slug: "kripto", kind: "topic", label: { tr: "Kripto", en: "Crypto", et: "Krüpto" } },
+  { slug: "siber", kind: "topic", label: { tr: "Siber", en: "Cyber", et: "Küber" } },
+  { slug: "savunma", kind: "topic", label: { tr: "Savunma", en: "Defence", et: "Kaitse" } },
+  { slug: "otomobil", kind: "topic", label: { tr: "Otomobil", en: "Cars", et: "Autod" } },
+  { slug: "oyun", kind: "topic", label: { tr: "Oyun", en: "Gaming", et: "Mängud" } },
+  { slug: "spor", kind: "topic", label: { tr: "Spor", en: "Sports", et: "Sport" } },
+  { slug: "kultur", kind: "topic", label: { tr: "Kültür", en: "Culture", et: "Kultuur" } },
+  { slug: "tasarim", kind: "topic", label: { tr: "Tasarım", en: "Design", et: "Disain" } },
+  { slug: "yasam", kind: "topic", label: { tr: "Yaşam", en: "Life", et: "Elu" } },
   { slug: "borsa", kind: "topic", label: { tr: "Borsa", en: "Markets", et: "Börs" } },
   { slug: "hava", kind: "topic", label: { tr: "Hava", en: "Weather", et: "Ilm" } },
   { slug: "deprem", kind: "topic", label: { tr: "Deprem", en: "Earthquakes", et: "Maavärinad" } },
-  { slug: "kripto", kind: "topic", label: { tr: "Kripto", en: "Crypto", et: "Krüpto" } },
-  { slug: "siber", kind: "topic", label: { tr: "Siber", en: "Cyber", et: "Küber" } },
-  { slug: "uzay", kind: "topic", label: { tr: "Uzay", en: "Space", et: "Kosmos" } },
 ];
 
 export const REGIONS: Section[] = [
@@ -28,6 +38,7 @@ export const REGIONS: Section[] = [
   { slug: "turkiye", kind: "region", label: { tr: "Türkiye", en: "Turkey", et: "Türgi" } },
   { slug: "avrupa", kind: "region", label: { tr: "Avrupa", en: "Europe", et: "Euroopa" } },
   { slug: "abd", kind: "region", label: { tr: "ABD", en: "USA", et: "USA" } },
+  { slug: "dunya", kind: "region", label: { tr: "Dünya", en: "World", et: "Maailm" } },
 ];
 
 // Nav'da görünmeyen ama içerik etiketi olarak yaşayan bölümler.
