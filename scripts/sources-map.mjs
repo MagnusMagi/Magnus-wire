@@ -75,6 +75,13 @@ export function mapSection(category) {
   return CATEGORY_TO_SECTION[category] ?? null;
 }
 
+// kaynaklar.md aynı feed'i iki kez listeliyor: normal ve `?v=2` cache-busting
+// ekiyle (1395 satırın 647'si böyle bir ikiz). Aynı feed'i iki kez çekmek
+// çekimlerin ~%45'ini boşa harcayıp rotasyon devrini iki katına çıkarıyordu.
+export function normalizeFeedUrl(url) {
+  return url.trim().replace(/[?&]v=2$/, "");
+}
+
 // `## Bölge (N)` → `### Kategori (N)` → `- ✅ **Ad** — <url> _(dil: xx)_`
 export function parseSourcesMarkdown(text) {
   const rows = [];
@@ -89,7 +96,7 @@ export function parseSourcesMarkdown(text) {
     if (!item) continue;
     const [, mark, name, url, lang] = item;
     rows.push({
-      url: url.trim(),
+      url: normalizeFeedUrl(url),
       name: name.trim(),
       // Orijinal kategori saklanır: eşleme değişince "hangi satırlar bu
       // kategoriden geldi" sorusu markdown'ı yeniden ayrıştırmadan cevaplanabilsin.

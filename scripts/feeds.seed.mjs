@@ -22,13 +22,13 @@ export const FEED_SEED = [
   { url: "https://www.bleepingcomputer.com/feed/", section: "siber" },
   { url: "https://dev.to/feed", section: "yazilim" },
   { url: "https://www.sciencedaily.com/rss/all.xml", section: "bilim" },
-  { url: "https://www.eu-startups.com/feed/", region: "avrupa", section: "finans" },
+  { url: "https://www.eu-startups.com/feed/", region: "avrupa", section: "girisim" },
   { url: "https://feeds.bbci.co.uk/news/business/rss.xml", section: "finans" },
   { url: "https://shiftdelete.net/feed", region: "turkiye" },
   { url: "https://news.err.ee/rss", region: "estonya" },
   { url: "https://www.err.ee/rss", region: "estonya" },               // ERR Estonca ana akış (öne çıkan/top haberler)
   { url: "https://www.theverge.com/rss/index.xml" },
-  { url: "https://webrazzi.com/feed/", region: "turkiye", section: "finans" },
+  { url: "https://webrazzi.com/feed/", region: "turkiye", section: "girisim" },
   { url: "https://tehnika.postimees.ee/rss", region: "estonya" },
 
   // ── 2. tur: ikinci kaynaklar ──
@@ -37,7 +37,7 @@ export const FEED_SEED = [
   { url: "https://feeds.feedburner.com/TheHackersNews", section: "siber" },
   { url: "https://github.blog/feed/", section: "yazilim" },
   { url: "https://www.newscientist.com/feed/home/", section: "bilim" },
-  { url: "https://techcrunch.com/category/startups/feed/", section: "finans" },
+  { url: "https://techcrunch.com/category/startups/feed/", section: "girisim" },
   { url: "https://www.bloomberght.com/rss", region: "turkiye", section: "finans" },
   { url: "https://www.webtekno.com/rss.xml", region: "turkiye" },
   { url: "https://feeds.bbci.co.uk/news/world/rss.xml", section: "gundem" },
@@ -46,8 +46,8 @@ export const FEED_SEED = [
   { url: "https://estonianworld.com/feed/", region: "estonya" },
   { url: "https://www.wired.com/feed/rss" },
   { url: "https://www.aa.com.tr/tr/rss/default?cat=guncel", region: "turkiye", section: "gundem" },
-  { url: "https://www.dunya.com/rss", region: "turkiye", section: "finans" },
-  { url: "https://www.donanimhaber.com/rss/tum/", region: "turkiye", section: "donanim" }, // 2. donanım kaynağı (TR, forced)
+  { url: "https://www.dunya.com/rss", region: "turkiye" },
+  { url: "https://www.donanimhaber.com/rss/tum/", region: "turkiye" }, // 2. donanım kaynağı (TR, forced)
   { url: "https://news.postimees.ee/rss", region: "estonya" },
   { url: "https://www.postimees.ee/rss", region: "estonya" },
 
@@ -56,7 +56,7 @@ export const FEED_SEED = [
   { url: "https://phys.org/rss-feed/space-news/", section: "uzay" },
   { url: "https://krebsonsecurity.com/feed/", section: "siber" },
   { url: "https://phys.org/rss-feed/", section: "bilim" },
-  { url: "https://sifted.eu/feed", region: "avrupa", section: "finans" },
+  { url: "https://sifted.eu/feed", region: "avrupa", section: "girisim" },
   { url: "https://hnrss.org/frontpage" },
   { url: "https://www.engadget.com/rss.xml" },
   { url: "https://www.trthaber.com/manset_articles.rss", region: "turkiye", section: "gundem" },
@@ -72,4 +72,21 @@ export const FEED_SEED = [
   { url: "https://www.marketwatch.com/rss/topstories", section: "finans" },
   { url: "https://www.log.com.tr/feed/", region: "turkiye" },
   { url: "https://www.teknoblog.com/feed/", region: "turkiye" },
+  // ── Öncelik şeridinin kapsamadığı bölümler ──
+  // Bu bölümler yalnız rotasyon havuzundaydı (12 saatte bir uğranıyor) ve
+  // sitede boş kalıyorlardı: 150 kaynaklı yasam'da 0 haber varken 3 kaynaklı
+  // kripto'da 12 haber vardı. Çekirdeğe alındılar → her koşuda taranıyorlar.
+  { url: "https://www.fotomac.com.tr/rss/anasayfa.xml", region: "turkiye", section: "spor" },
+  { url: "https://www.soccernews.com/feed", section: "spor" },
+  { url: "https://www.comingsoon.net/feed", section: "kultur" },
+  { url: "https://variety.com/feed/", section: "kultur" },
+  { url: "https://www.eurogamer.net/?format=rss", section: "oyun" },
+  { url: "https://www.gamespot.com/feeds/mashup/", section: "oyun" },
+  { url: "https://www.autocar.co.uk/rss", section: "otomobil" },
+  { url: "https://warontherocks.com/feed/", section: "savunma" },
+  { url: "https://theaviationist.com/feed/", section: "savunma" },
+  { url: "https://petapixel.com/feed/", section: "tasarim" },
+  { url: "https://uxdesign.cc/feed", section: "tasarim" },
+  { url: "https://www.elle.com/rss/beauty.xml/", section: "yasam" },
+  { url: "https://www.theguardian.com/uk/travel/rss", section: "yasam" },
 ];

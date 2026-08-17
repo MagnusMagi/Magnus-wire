@@ -334,7 +334,12 @@ async function main() {
       if (forcedSection && SECTION_CAPS[forcedSection] != null && secCount[forcedSection] >= SECTION_CAPS[forcedSection]) { skips.kota++; continue; }
       attempts++;
       const o = await rewrite(item);
-      if (forcedRegion) o.region = forcedRegion;
+      // Bölge zorlaması artık YEDEK, override DEĞİL.
+      // Zorlama kaynağın ülkesini haberin konusu sanıyordu: Türk gazetesinin
+      // "Belçika'da dev orman yangını" haberi `turkiye` etiketi alıyordu.
+      // AI içerikten bir bölge çıkarabildiyse ona güvenilir; yalnız kararsız
+      // kaldığında (null) kaynağın ülkesine düşülür.
+      if (!o.region && forcedRegion) o.region = forcedRegion;
       if (forcedSection && TOPICS[forcedSection]) o.section = forcedSection;
       // "dunya" bölgesi 28 ülkeyi topluyor; ülke bilgisi kaybolmasın diye
       // etiket olarak eklenir (/ara?tag=india ile bulunabilir).
