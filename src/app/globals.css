@@ -35,7 +35,14 @@ body {
   background-image: repeating-linear-gradient(
     to bottom, transparent 0 27px, rgba(26, 25, 22, 0.018) 27px 28px);
 }
-a { color: inherit; text-decoration: none; }
+/* ⚠️ @layer base ŞART — img kuralıyla aynı tuzak: Tailwind v4'te KATMANSIZ CSS
+   KATMANLI utility'leri YENER. Bu satır katmansızken her <a> üzerindeki renk
+   utility'sini eziyordu: /akis'teki "Konulara göz at" butonu `bg-ink text-paper`
+   olduğu halde yazı ink kalıyor, ink zemin üstünde kontrast 1.00 ile görünmez
+   oluyordu (ölçüldü). text-wire/text-signal kullanan tüm bağlantılar da etkiliydi. */
+@layer base {
+  a { color: inherit; text-decoration: none; }
+}
 ::selection { background: var(--color-signal); color: #fff; }
 :focus-visible { outline: none; }
 
