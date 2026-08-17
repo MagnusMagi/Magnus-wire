@@ -39,7 +39,7 @@ export function CatNav({ locale, active = "akis" }: { locale: Locale; active?: s
         <Link
           href={`/${locale}/${slug}`}
           aria-current={isActive ? "page" : undefined}
-          className={`block px-2 py-1 font-mono text-[11px] uppercase tracking-wide whitespace-nowrap border transition-colors ${
+          className={`block px-2 py-1 text-xs font-bold uppercase tracking-wider whitespace-nowrap border transition-colors ${
             isActive
               ? "border-signal text-signal font-bold"
               : "border-line text-ink-2 hover:border-ink hover:text-ink"
@@ -53,7 +53,7 @@ export function CatNav({ locale, active = "akis" }: { locale: Locale; active?: s
 
   // Grup başlığı: alt satırın "bağlantı çorbası" gibi okunmasını engelliyor.
   const groupLabel = (text: string) => (
-    <li aria-hidden className="flex-none font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-wire pr-0.5">
+    <li aria-hidden className="flex-none text-xs font-bold uppercase tracking-wider text-wire pr-0.5">
       {text}
     </li>
   );
