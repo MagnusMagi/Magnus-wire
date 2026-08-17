@@ -7,6 +7,12 @@ export interface Dispatch {
   tags: string[]; hero: string | null; live: boolean; author: string;
   readMinutes: number; publishedAt: string; date: string; time: string;
   sourceUrl: string | null; sourceName: string | null;
+  /**
+   * Gövde gerçekten istenen dilde mi? Ingest yalnız TR gövdesi üretiyor;
+   * EN/ET gövdesi talep üzerine çevrilene kadar TR'ye düşer (bkz lib/translate).
+   * Detay sayfası buna bakıp çeviriyi tetikliyor.
+   */
+  bodyTranslated: boolean;
 }
 
 const TZ = "Europe/Istanbul";
@@ -29,6 +35,9 @@ function mapRow(r: Row, locale: Locale): Dispatch {
   const summary = c.summary ?? r.summary;
   const body = c.body ?? r.body;
   const keyFacts = (c.keyFacts ?? r.content?.tr?.keyFacts ?? []).filter((x): x is string => typeof x === "string" && x.trim().length > 0);
+  // TR her zaman "çevrilmiş" sayılır (kaynak dil). Diğer diller için gövde,
+  // ancak o dilin kendi content bloğundan geldiyse çeviridir.
+  const bodyTranslated = locale === "tr" || Boolean(r.content?.[locale]?.body);
   const d = new Date(r.published_at);
   const words = (body || "").trim().split(/\s+/).length;
   return {
@@ -38,6 +47,7 @@ function mapRow(r: Row, locale: Locale): Dispatch {
     readMinutes: Math.max(1, Math.round(words / 200)),
     publishedAt: r.published_at, date: dateFmt.format(d), time: timeFmt.format(d),
     sourceUrl: r.source_url ?? null, sourceName: r.source_name ?? null,
+    bodyTranslated,
   };
 }
 

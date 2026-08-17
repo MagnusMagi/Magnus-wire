@@ -109,11 +109,20 @@ function isFresh(item) {
 function shortHash(s) { let h = 0; for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0; return Math.abs(h).toString(36).slice(0, 6); }
 
 async function rewrite(item) {
-  const sys = "Sen çok dilli bir haber editörüsün (teknoloji + güncel/gündem). Verilen kaynaktan özgün, kısa, doğru bir haber üret ve TÜRKÇE, İNGİLİZCE ve ESTONCA olarak yaz. Abartma, tıklama tuzağı kurma.";
+  // Gövde YALNIZ Türkçe üretilir. EN/ET için sadece başlık + spot istenir:
+  // liste/kategori/arama sayfaları ve sitemap üç dilde anlamlı kalsın diye.
+  // EN/ET gövdesi, biri o dildeki habere gerçekten girdiğinde çevrilip
+  // kaydedilir (src/lib/translate.ts) — yani gövde maliyeti okunma sayısına
+  // bağlı, ingest hacmine değil. Ölçüm: TR payı üretimin %33'ü, bu değişiklik
+  // çıktı token'ını ~%60 düşürüyor.
+  // ⚠️ keyFacts vurgusu sys prompt'ta AÇIKÇA duruyor: gövdeyi tek dile indiren
+  // ilk sürümde model dikkatini "sadece başlık/spot çevir" kısmına verip
+  // tr.keyFacts'i boş bırakmaya başlamıştı → öğelerin çoğu doğrulamada eleniyordu.
+  const sys = "Sen çok dilli bir haber editörüsün (teknoloji + güncel/gündem). Verilen kaynaktan özgün, kısa, doğru bir haber üret. Gövdeyi yalnız TÜRKÇE yaz; İngilizce ve Estonca için sadece başlık ve spot çevir. tr.keyFacts alanı ZORUNLUDUR ve en az 3 madde içermelidir — boş bırakma. Abartma, tıklama tuzağı kurma.";
   const snippet = (item.contentSnippet || item["content:encoded"] || item.content || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 2500);
   const bodyRule = "EN AZ 3 dolu paragraf (her paragraf 3-5 cümle, toplam ≥250 kelime). Markdown; gerekirse bir ## ara başlık. Bağlam, arka plan ve olası etkileri açıkla — yüzeysel özet GEÇME.";
   const factsRule = "haberin 3-5 kilit gerçeği / öne çıkan noktası; her madde tek kısa cümle, somut (sayı/isim/tarih varsa kullan)";
-  const user = `Kaynak başlık: ${item.title}\nKaynak metin: ${snippet}\n\nHer dil için (tr, en, et) AYNI haberi tam olarak yaz. SADECE şu JSON'u döndür:\n{\n "section": "şunlardan biri: ${Object.keys(TOPICS).join(", ")}",\n "region": "şunlardan biri ya da boş: estonya, turkiye, avrupa, abd",\n "tags": ["2-4 küçük harf etiket"],\n "tr": {"title":"≤90 karakter", "summary":"tek cümle spot", "body":"${bodyRule}", "keyFacts":["${factsRule}"]},\n "en": {"title":"", "summary":"", "body":"(same body rule)", "keyFacts":[]},\n "et": {"title":"", "summary":"", "body":"(same body rule)", "keyFacts":[]}\n}`;
+  const user = `Kaynak başlık: ${item.title}\nKaynak metin: ${snippet}\n\nGövdeyi SADECE Türkçe yaz. "en" ve "et" için yalnızca başlık ve spot'un çevirisini ver — gövde YAZMA. SADECE şu JSON'u döndür:\n{\n "section": "şunlardan biri: ${Object.keys(TOPICS).join(", ")}",\n "region": "şunlardan biri ya da boş: estonya, turkiye, avrupa, abd",\n "tags": ["2-4 küçük harf etiket"],\n "tr": {"title":"≤90 karakter", "summary":"tek cümle spot", "body":"${bodyRule}", "keyFacts":["ZORUNLU, 3-5 madde — ${factsRule}"]},\n "en": {"title":"tr.title'ın İngilizcesi", "summary":"tr.summary'nin İngilizcesi"},\n "et": {"title":"tr.title'ın Estoncası", "summary":"tr.summary'nin Estoncası"}\n}`;
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_API_KEY}` },
@@ -134,13 +143,19 @@ async function rewrite(item) {
   if (!TOPICS[o.section]) o.section = "gundem";
   o.region = REGIONS.has(o.region) ? o.region : null;
   o.tags = Array.isArray(o.tags) ? o.tags.slice(0, 4).map((t) => slugify(String(t))) : [];
-  for (const l of ["tr", "en", "et"]) {
+  // TR tam doğrulanır: gövde + keyFacts kalite eşiği burada.
+  const tr = o.tr;
+  if (!tr?.title || !tr?.body) throw new Error("eksik tr içerik");
+  const paras = String(tr.body).split(/\n\s*\n/).filter((p) => p.trim().length > 40);
+  if (paras.length < 3) throw new Error(`tr gövdesi 3 paragraftan kısa (${paras.length})`);
+  tr.keyFacts = Array.isArray(tr.keyFacts) ? tr.keyFacts.map((f) => String(f).trim()).filter(Boolean).slice(0, 5) : [];
+  if (tr.keyFacts.length < 3) throw new Error(`tr keyFacts<3 (${tr.keyFacts.length})`);
+  // EN/ET'den yalnız başlık + spot beklenir. Model yine de gövde döndürürse
+  // atılır — gövdenin tek kaynağı TR, çevirisi talep üzerine üretilir.
+  for (const l of ["en", "et"]) {
     const c = o[l];
-    if (!c?.title || !c?.body) throw new Error(`eksik ${l} içerik`);
-    const paras = String(c.body).split(/\n\s*\n/).filter((p) => p.trim().length > 40);
-    if (paras.length < 3) throw new Error(`${l} gövdesi 3 paragraftan kısa (${paras.length})`);
-    c.keyFacts = Array.isArray(c.keyFacts) ? c.keyFacts.map((f) => String(f).trim()).filter(Boolean).slice(0, 5) : [];
-    if (c.keyFacts.length < 3) throw new Error(`${l} keyFacts<3 (${c.keyFacts.length})`);
+    if (!c?.title || !c?.summary) throw new Error(`eksik ${l} başlık/spot`);
+    o[l] = { title: String(c.title).trim(), summary: String(c.summary).trim() };
   }
   return o;
 }

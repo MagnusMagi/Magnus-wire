@@ -7,6 +7,7 @@ import { CatNav } from "@/components/CatNav";
 import { ArticleImage } from "@/components/ArticleImage";
 import { mdxComponents } from "@/components/mdx";
 import { getDispatch, getDispatches } from "@/lib/dispatches";
+import { translateBody } from "@/lib/translate";
 import { sectionLabel, sectionHref } from "@/lib/site";
 import { SourceLink } from "@/components/SourceLink";
 import { ReadingProgress } from "@/components/ReadingProgress";
@@ -37,6 +38,14 @@ export default async function DispatchPage({ params }: { params: Promise<{ local
   const locale = (isLocale(raw) ? raw : "tr") as Locale;
   const d = await getDispatch(locale, slug);
   if (!d) notFound();
+
+  // Ingest yalnız TR gövdesi üretiyor. EN/ET gövdesi ilk kez o dilde okunduğunda
+  // çevrilip DB'ye yazılır. Render BEKLETİLMEZ: bu okuyucu TR gövdesini görür,
+  // çeviri arka planda tamamlanır ve cron'un 30 dakikada bir çağırdığı
+  // revalidate ile sonraki ziyaretçilere çevrilmiş olarak çıkar.
+  if (!d.bodyTranslated) {
+    void translateBody({ slug: d.slug, locale, trBody: d.body, trKeyFacts: d.keyFacts });
+  }
 
   const all = await getDispatches(locale);
   const idx = all.findIndex((x) => x.slug === d.slug);
