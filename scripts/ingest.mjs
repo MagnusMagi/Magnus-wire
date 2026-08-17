@@ -28,6 +28,8 @@ const CONCURRENCY = Number(process.env.INGEST_CONCURRENCY || 12);
 // denenir (1421 kaynak / 60 = ~24 koşu ≈ yarım gün), yani her hata ayrı bir güne
 // denk gelir. 10 olsaydı ölü bir feed ~5 gün havuzda slot işgal ederdi.
 const FAIL_LIMIT = Number(process.env.INGEST_FAIL_LIMIT || 3);
+// Bundan eski öğeler rewrite edilmeden elenir (bkz isFresh).
+const MAX_AGE_DAYS = Number(process.env.INGEST_MAX_AGE_DAYS || 7);
 
 // AI'nın sınıflandırabileceği bölümler (slug → kicker etiketi).
 // site.ts'teki borsa/hava/deprem BİLEREK yok: onlar canlı-veri panosu, haber
@@ -86,6 +88,17 @@ function jaccard(a, b) {
   const sb = new Set(b); let inter = 0;
   for (const x of new Set(a)) if (sb.has(x)) inter++;
   return inter / (a.length + b.length - inter);
+}
+// Budama `published_at` sıralı ve yalnız en yeni KEEP kadarı kalıyor. Havuzda
+// blog/evergreen kaynaklar da olduğu için eski yazılar önce OpenAI'ye
+// gönderilip hemen ardından budanıyordu — çift israf. Yaşlıları rewrite'tan
+// ÖNCE ele. Tarihi olmayan öğe taze sayılır (feed'lerin bir kısmı tarih vermiyor).
+function isFresh(item) {
+  const raw = item.isoDate || item.pubDate;
+  if (!raw) return true;
+  const t = Date.parse(raw);
+  if (Number.isNaN(t)) return true;
+  return Date.now() - t <= MAX_AGE_DAYS * 86400000;
 }
 function shortHash(s) { let h = 0; for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0; return Math.abs(h).toString(36).slice(0, 6); }
 
@@ -193,7 +206,7 @@ async function main() {
       try {
         const f = await parser.parseURL(feed.url);
         for (const item of f.items || []) {
-          if (item.link && !seen.has(item.link)) {
+          if (item.link && !seen.has(item.link) && isFresh(item)) {
             perFeed[i].push({
               item, feedTitle: f.title || feed.name || feed.url,
               forcedRegion: feed.region || null, forcedSection: feed.section || null,
