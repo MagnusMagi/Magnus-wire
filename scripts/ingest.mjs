@@ -202,7 +202,15 @@ async function selectFeeds(sb) {
     log("sources okunamadı, çekirdeğe düşülüyor:", (core.error || rest.error).message);
     return FEED_SEED.map((f) => ({ ...f, isCore: true }));
   }
-  const coreRows = (core.data || []).map((f) => ({ ...f, isCore: true }));
+  // ⚠️ Çekirdek şerit KARIŞTIRILIR. Rotasyon havuzu FIFO ile adil dolaşılıyor
+  // ama çekirdek her koşuda aynı dizi sırasıyla geliyordu; tur başına yalnız
+  // ~3 çekirdek denemesi olduğu için hep listenin ilk feed'leri kazanıyordu.
+  // Sonuç: 5 sağlıklı girisim kaynağı (sifted/webrazzi/eu-startups/techcrunch)
+  // öğe döndürdüğü halde bölüm günlerce BOŞ kaldı. Karıştırma her koşuda farklı
+  // çekirdek feed'lere öncelik verir, zamanla hepsi pay alır.
+  const coreRows = (core.data || [])
+    .map((f) => ({ ...f, isCore: true, _r: Math.random() }))
+    .sort((a, b) => a._r - b._r);
   const restRows = (rest.data || []).map((f) => ({ ...f, isCore: false }));
   if (!coreRows.length && !restRows.length) {
     log("sources boş, çekirdeğe düşülüyor (scripts/import-sources.mjs koştur)");
