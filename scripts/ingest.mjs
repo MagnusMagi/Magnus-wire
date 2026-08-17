@@ -32,6 +32,8 @@ const KEEP = Number(process.env.INGEST_KEEP || 200);
 const FEED_LIST = [
   // ── 1. tur: her kategori/bölgeden birer kaynak (round-robin'in ilk turu bunları örnekler) ──
   { url: "https://techcrunch.com/feed/" },                                            // genel tech (AI sınıflar)
+  { url: "https://venturebeat.com/category/ai/feed/", section: "yapay-zeka" },         // pür AI → yapay-zeka (forced; AI sınıfı yoksa bu kategori boş kalıyordu)
+  { url: "https://www.tomshardware.com/feeds/all", section: "donanim" },               // pür donanım → donanim (forced)
   { url: "https://www.ntv.com.tr/gundem.rss", region: "turkiye", section: "gundem" },
   { url: "https://www.coindesk.com/arc/outboundfeeds/rss/", section: "kripto" },
   { url: "https://www.nasa.gov/news-release/feed/", section: "uzay" },
@@ -58,11 +60,12 @@ const FEED_LIST = [
   { url: "https://www.webtekno.com/rss.xml", region: "turkiye" },
   { url: "https://feeds.bbci.co.uk/news/world/rss.xml", section: "gundem" },
   { url: "https://feeds.arstechnica.com/arstechnica/technology-lab" },
+  { url: "https://the-decoder.com/feed/", section: "yapay-zeka" },                     // 2. yapay-zeka kaynağı (forced)
   { url: "https://estonianworld.com/feed/", region: "estonya" },
   { url: "https://www.wired.com/feed/rss" },
   { url: "https://www.aa.com.tr/tr/rss/default?cat=guncel", region: "turkiye", section: "gundem" },
   { url: "https://www.dunya.com/rss", region: "turkiye", section: "finans" },
-  { url: "https://www.donanimhaber.com/rss/tum/", region: "turkiye" },
+  { url: "https://www.donanimhaber.com/rss/tum/", region: "turkiye", section: "donanim" }, // 2. donanım kaynağı (TR, forced)
   { url: "https://news.postimees.ee/rss", region: "estonya" },
   { url: "https://www.postimees.ee/rss", region: "estonya" },
 
