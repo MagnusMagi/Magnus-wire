@@ -89,4 +89,6 @@ async function main() {
   log(`bitti. tabloda toplam: ${count}`);
 }
 
-main().catch((e) => { log("FATAL", e.message); process.exit(1); });
+// Açıkça exit: supabase istemcisinin keep-alive soketleri event loop'u açık
+// tutuyor (bkz ingest.mjs'teki aynı not).
+main().then(() => process.exit(0)).catch((e) => { log("FATAL", e.message); process.exit(1); });

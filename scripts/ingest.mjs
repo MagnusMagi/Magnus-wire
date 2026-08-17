@@ -24,7 +24,10 @@ const FEEDS_PER_RUN = Number(process.env.INGEST_FEEDS_PER_RUN || 60);
 const CONCURRENCY = Number(process.env.INGEST_CONCURRENCY || 12);
 // Üst üste bu kadar hata veren kaynak otomatik kapatılır (ölü feed'ler havuzu
 // tıkamasın). Başarılı çekimde sayaç sıfırlanır.
-const FAIL_LIMIT = Number(process.env.INGEST_FAIL_LIMIT || 10);
+// Düşük tutuluyor: FIFO rotasyonda bir kaynak tam devir başına YALNIZ BİR KEZ
+// denenir (1421 kaynak / 60 = ~24 koşu ≈ yarım gün), yani her hata ayrı bir güne
+// denk gelir. 10 olsaydı ölü bir feed ~5 gün havuzda slot işgal ederdi.
+const FAIL_LIMIT = Number(process.env.INGEST_FAIL_LIMIT || 3);
 
 // AI'nın sınıflandırabileceği bölümler (slug → kicker etiketi).
 // site.ts'teki borsa/hava/deprem BİLEREK yok: onlar canlı-veri panosu, haber
@@ -267,4 +270,9 @@ async function main() {
   }
   log(`bitti. eklenen: ${inserted}`);
 }
-main().catch((e) => { log("FATAL", e.message); process.exit(1); });
+// ⚠️ Açıkça exit ŞART. Eşzamanlı fetch'ten sonra keep-alive soketleri açık
+// kalıyor ve main() bittiği halde event loop kapanmıyor (süreç ep_poll'da
+// dakikalarca asılı kalıyor). Cron `flock -n` ile koştuğu için asılı süreç
+// kilidi bırakmaz → SONRAKİ TÜM KOŞULAR SESSİZCE ATLANIR. Tüm yazmalar
+// main() içinde await edildiği için burada çıkmak veri kaybettirmez.
+main().then(() => process.exit(0)).catch((e) => { log("FATAL", e.message); process.exit(1); });
