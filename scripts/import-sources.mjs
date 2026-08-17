@@ -37,7 +37,7 @@ async function main() {
   const byUrl = new Map();
   for (const r of parsed) {
     byUrl.set(r.url, {
-      url: r.url, name: r.name, section: r.section,
+      url: r.url, name: r.name, category: r.category, section: r.section,
       region: r.region, country: r.country, lang: r.lang,
       // Havuzdan gelenler rotasyona tabi; çekirdek aşağıda true'ya çekilir.
       priority: false,
@@ -50,6 +50,7 @@ async function main() {
     byUrl.set(f.url, {
       url: f.url,
       name: existing?.name || hostOf(f.url),
+      category: existing?.category ?? null,
       // Kürasyonlu değer varsa o kazanır; yoksa markdown'dan geleni koru.
       section: f.section ?? existing?.section ?? null,
       region: f.region ?? existing?.region ?? null,

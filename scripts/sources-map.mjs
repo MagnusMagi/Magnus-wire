@@ -23,7 +23,11 @@ export const CATEGORY_TO_SECTION = {
   "Sağlık": "bilim", "Enerji": "bilim",
   "Space": "uzay", "Uzay": "uzay",
   // ekonomi
-  "Personal finance": "finans", "Business & Economy": "finans", "Ekonomi": "finans",
+  // ⚠️ "Personal finance" BİLEREK finans değil yasam: bu kaynaklar haber değil
+  // affiliate/listicle üretiyor ("Walmart'ta 5 dolardan başlayan fırsatlar",
+  // "Webull 12 ücretsiz hisse") ve Borsa'daki "Piyasa Haberleri"ni kirletiyordu.
+  "Personal finance": "yasam",
+  "Business & Economy": "finans", "Ekonomi": "finans",
   "Startups": "girisim",
   "Savunma": "savunma",
   // ilgi alanları
@@ -87,6 +91,9 @@ export function parseSourcesMarkdown(text) {
     rows.push({
       url: url.trim(),
       name: name.trim(),
+      // Orijinal kategori saklanır: eşleme değişince "hangi satırlar bu
+      // kategoriden geldi" sorusu markdown'ı yeniden ayrıştırmadan cevaplanabilsin.
+      category: category ?? null,
       section: mapSection(category),
       region: mapRegion(country),
       country: NO_REGION.has(country) ? null : country,
