@@ -30,7 +30,7 @@ const STRINGS: Record<Locale, Dict> = {
     emptyFeed: "Akış henüz boş — tel masası ilk dispatch'leri bekliyor.",
     emptySection: "Bu bölümde henüz dispatch yok.",
     about: "Hakkımızda", contact: "İletişim", imprint: "Künye", privacy: "Gizlilik", cookies: "Çerezler",
-    copy: "© 2026 MagiWire — prototip", agoNow: "az önce", agoMin: "dk önce", agoHour: "sa önce", follow: "Takip Et", followBlurb: "Otomatik, kişisel bir teknoloji akışı. RSS ile takip et.", rssBtn: "RSS akışı →", about2: "Proje hakkında →", source: "Kaynak", viaSource: "kaynak", siteLogout: "Çıkış yap",
+    copy: "© 2026 MagiWire — prototip", agoNow: "az önce", agoMin: "dk önce", agoHour: "sa önce", follow: "Takip Et", followBlurb: "Otomatik, kişisel bir teknoloji akışı. RSS ile takip et.", rssBtn: "RSS akışı →", about2: "Proje hakkında →", source: "Kaynak", viaSource: "kaynak", siteLogout: "Çıkış yap", regionsLabel: "Bölge", panelsLabel: "Pano",
   },
   en: {
     login: "Sign in", register: "Register", breaking: "Breaking",
@@ -51,7 +51,7 @@ const STRINGS: Record<Locale, Dict> = {
     emptyFeed: "The feed is empty — the wire desk awaits the first dispatches.",
     emptySection: "No dispatches in this section yet.",
     about: "About", contact: "Contact", imprint: "Masthead", privacy: "Privacy", cookies: "Cookies",
-    copy: "© 2026 MagiWire — prototype", agoNow: "just now", agoMin: "min ago", agoHour: "h ago", follow: "Follow", followBlurb: "An automated, personal tech feed. Follow via RSS.", rssBtn: "RSS feed →", about2: "About the project →", source: "Source", viaSource: "via", siteLogout: "Log out",
+    copy: "© 2026 MagiWire — prototype", agoNow: "just now", agoMin: "min ago", agoHour: "h ago", follow: "Follow", followBlurb: "An automated, personal tech feed. Follow via RSS.", rssBtn: "RSS feed →", about2: "About the project →", source: "Source", viaSource: "via", siteLogout: "Log out", regionsLabel: "Regions", panelsLabel: "Panels",
   },
   et: {
     login: "Logi sisse", register: "Registreeru", breaking: "Värske",
@@ -72,7 +72,7 @@ const STRINGS: Record<Locale, Dict> = {
     emptyFeed: "Voog on tühi — toimetus ootab esimesi uudiseid.",
     emptySection: "Selles sektsioonis pole veel uudiseid.",
     about: "Meist", contact: "Kontakt", imprint: "Impressum", privacy: "Privaatsus", cookies: "Küpsised",
-    copy: "© 2026 MagiWire — prototüüp", agoNow: "äsja", agoMin: "min tagasi", agoHour: "t tagasi", follow: "Jälgi", followBlurb: "Automaatne isiklik tehnoloogiavoog. Jälgi RSS kaudu.", rssBtn: "RSS-voog →", about2: "Projektist →", source: "Allikas", viaSource: "allikas", siteLogout: "Logi välja",
+    copy: "© 2026 MagiWire — prototüüp", agoNow: "äsja", agoMin: "min tagasi", agoHour: "t tagasi", follow: "Jälgi", followBlurb: "Automaatne isiklik tehnoloogiavoog. Jälgi RSS kaudu.", rssBtn: "RSS-voog →", about2: "Projektist →", source: "Allikas", viaSource: "allikas", siteLogout: "Logi välja", regionsLabel: "Piirkond", panelsLabel: "Paneelid",
   },
 };
 

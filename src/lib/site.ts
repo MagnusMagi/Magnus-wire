@@ -48,6 +48,18 @@ export const CONTENT_SECTIONS: Section[] = [
   { slug: "finans", kind: "topic", label: { tr: "Finans", en: "Finance", et: "Rahandus" } },
 ];
 
+// Canlı veri panoları — haber listesi değil, araç. TOPICS içinde kalıyorlar
+// (rota ve etiket çözümü değişmesin) ama SUNUMDA ayrılıyorlar: haber
+// kategorileriyle aynı şeritte durunca 20 öğelik nav ~1559px'e ulaşıyor ve
+// 1440px ekranda son beş başlık ekran dışında kalıyordu.
+export const DASHBOARD_SLUGS = ["borsa", "hava", "deprem"] as const;
+export const NEWS_TOPICS: Section[] = TOPICS.filter(
+  (s) => !DASHBOARD_SLUGS.includes(s.slug as (typeof DASHBOARD_SLUGS)[number]),
+);
+export const DASHBOARDS: Section[] = TOPICS.filter((s) =>
+  DASHBOARD_SLUGS.includes(s.slug as (typeof DASHBOARD_SLUGS)[number]),
+);
+
 export const ALL_SECTIONS: Section[] = [...TOPICS, ...REGIONS, ...CONTENT_SECTIONS];
 export const TOPIC_SLUGS = TOPICS.map((s) => s.slug);
 export const REGION_SLUGS = REGIONS.map((s) => s.slug);
