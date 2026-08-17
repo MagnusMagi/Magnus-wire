@@ -128,3 +128,43 @@ export function parseSourcesMarkdown(text) {
   }
   return rows;
 }
+
+// ── Alan adından ülke tahmini ────────────────────────────────────────────
+// Hem backfill hem de import bunu kullanır: kaynaklar.md'de OLMAYAN kürasyonlu
+// feed'lerin ülkesi başka türlü boş kalıyordu ve her yeniden içe aktarımda
+// backfill'in doldurduğu değerler null'a geri yazılıyordu.
+const TLD_COUNTRY = {
+  ".com.tr": "Türkiye", ".net.tr": "Türkiye", ".org.tr": "Türkiye", ".tr": "Türkiye",
+  ".ee": "Estonia",
+  ".co.uk": "United Kingdom", ".uk": "United Kingdom",
+  ".de": "Germany", ".fr": "France", ".it": "Italy", ".es": "Spain",
+  ".nl": "Netherlands", ".pl": "Poland", ".ie": "Ireland", ".pt": "Portugal",
+  ".dk": "Denmark", ".fi": "Finland", ".ua": "Ukraine", ".ru": "Russia",
+  ".in": "India", ".ph": "Philippines", ".mx": "Mexico", ".au": "Australia",
+  ".com.au": "Australia", ".ca": "Canada", ".za": "South Africa", ".br": "Brazil",
+  ".jp": "Japan", ".kr": "South Korea", ".cn": "China", ".sg": "Singapore",
+  ".nz": "New Zealand", ".ng": "Nigeria", ".pk": "Pakistan", ".bd": "Bangladesh",
+  ".ir": "Iran", ".il": "Israel", ".eg": "Egypt", ".ke": "Kenya",
+  ".sa": "Saudi Arabia", ".tw": "Taiwan", ".th": "Thailand", ".vn": "Vietnam",
+  ".hu": "Hungary", ".hr": "Croatia", ".ar": "Argentina", ".id": "Indonesia",
+};
+
+const HOST_COUNTRY = {
+  "webrazzi.com": "Türkiye",
+  "www.technopat.net": "Türkiye",
+  "www.teknoblog.com": "Türkiye",
+  "estonianworld.com": "Estonia",
+  "feeds.bbci.co.uk": "United Kingdom",
+  "www.theguardian.com": "United Kingdom",
+  "rss.dw.com": "Germany",
+};
+
+export function guessCountry(url) {
+  let host;
+  try { host = new URL(url).hostname; } catch { return "Global"; }
+  if (HOST_COUNTRY[host]) return HOST_COUNTRY[host];
+  const hit = Object.keys(TLD_COUNTRY).filter((t) => host.endsWith(t)).sort((a, b) => b.length - a.length)[0];
+  if (hit) return TLD_COUNTRY[hit];
+  // Kalanlar küresel yayın sayılır — yanlış ülke yazmaktansa "Global".
+  return "Global";
+}

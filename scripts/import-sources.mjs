@@ -9,7 +9,7 @@
 import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import { loadEnv, requireEnv } from "./env.mjs";
-import { parseSourcesMarkdown } from "./sources-map.mjs";
+import { parseSourcesMarkdown, guessCountry } from "./sources-map.mjs";
 import { FEED_SEED } from "./feeds.seed.mjs";
 
 loadEnv();
@@ -57,7 +57,9 @@ async function main() {
       // kalınca buraya düşülüyor), null olsaydı haber hiçbir bölge sayfasına
       // girmezdi. Kürasyonlu küresel feed'ler "dunya"ya düşer.
       region: f.region ?? existing?.region ?? "dunya",
-      country: existing?.country ?? null,
+      // ⚠️ null YAZMA: kaynaklar.md'de olmayan kürasyonlu feed'lerin ülkesi
+      // her içe aktarımda siliniyordu (backfill'in doldurduğu 26 kaynak).
+      country: existing?.country ?? guessCountry(f.url),
       lang: existing?.lang ?? null,
       // Çekirdek her koşuda çekilir (rotasyona girmez) — bkz
       // sql/20260817_source_priority.sql. ⚠️ Admin'den elle verilen öncelik

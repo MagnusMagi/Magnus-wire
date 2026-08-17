@@ -52,16 +52,26 @@ async function auditBatch(rows) {
     .map((r, i) => `${i + 1}. ${r.name} — ${r.url}${r.category ? ` [katalog kategorisi: ${r.category}]` : ""} (mevcut: ülke=${r.country || "?"}, bölüm=${r.section || "yok"})`)
     .join("\n");
 
-  const sys = "Sen bir haber kaynağı kataloğu denetçisisin. Verilen RSS kaynakları için ÜLKE ve BÖLÜM atamalarının doğruluğunu değerlendir. Emin değilsen değişiklik ÖNERME.";
-  const user = `Her kaynak için iki alanı kontrol et:
+  // ⚠️ Bu prompt bir kez baştan yazıldı. İlk sürüm 774 kaynakta 344 öneri
+  // üretti ve baskın desenlerin hepsi YANLIŞTI: (1) "gundem"in genel haber
+  // bölümü olduğu söylenmediği için 70 ulusal gazeteden bölümü silmek istedi,
+  // (2) "küresel yayınlara United States yazma" talimatını 62 kez çiğnedi,
+  // (3) bilerek taşıdığımız Personal finance kaynaklarını finans'a geri istedi.
+  // Ders: denetçiye kuralları DEĞİL, gerekçeleri ve karşı-örnekleri ver.
+  const sys = "Sen bir haber kaynağı kataloğu denetçisisin. Mevcut atamalar genelde DOĞRUDUR; görevin yalnız AÇIK ve KESİN hataları yakalamak. Şüphe varsa, tercih farkıysa ya da 'daha iyi olabilir' diyorsan SUSMAK doğrudur. Boş liste döndürmek başarısızlık değildir.";
+  const user = `Her kaynak için iki alanı kontrol et. SADECE açık hataları bildir.
 
 ÜLKE: SADECE şu listeden bir değer kullan (birebir aynı yaz, çeviri/eşanlam KULLANMA):
 ${COUNTRY_VOCAB.join(", ")}
-Yayının beat'i belirli bir ülkeyse o ülke, değilse "Global".
-Uluslararası/küresel yayınlarsa "Global". ⚠️ Merkezi ABD'de olan ama küresel yayın yapanlar (TechCrunch, The Verge, Wired gibi) "Global"dır, "United States" DEĞİL. "United States" yalnız ABD'yi konu alan ulusal yayınlar içindir.
+Yayının HABER ODAĞI belirli bir ülkeyse o ülke, uluslararası okur için yayın yapıyorsa "Global".
+⚠️ ŞİRKET MERKEZİ ÖNEMLİ DEĞİL, OKUR KİTLESİ ÖNEMLİ. TechCrunch/Verge/Wired/Engadget merkezleri ABD'de ama dünya okuruna yazar → "Global". "United States" yalnız ABD iç haberlerini ABD'lilere veren yayınlar içindir.
+⚠️ Mevcut ülke zaten makul bir ulusal ülkeyse (Australia, Japan, Spain, Poland...) DOKUNMA — "Global"a çevirmek neredeyse her zaman yanlıştır.
+Bu alan çoğu kaynakta doğrudur; ancak apaçık yanlışsa öneri yap.
 
-BÖLÜM: şunlardan biri ya da null (uygun değilse): ${SECTIONS.join(", ")}
-Kaynak tek bir konuya adanmışsa o bölüm; genel/karışık yayınsa null.
+BÖLÜM: şunlardan biri ya da null: ${SECTIONS.join(", ")}
+⚠️ "gundem" = GENEL HABER bölümüdür. Genel/karışık haber yayınları (ulusal gazeteler, haber ajansları, TV kanalları) "gundem"e AİTTİR — onlara null ÖNERME.
+null yalnız hiçbir bölüme oturmayan kaynaklar içindir.
+⚠️ Kişisel finans / para biriktirme / alışveriş tavsiyesi kaynakları BİLEREK "yasam"a atanmıştır (haber değil, yaşam tarzı içeriği) — bunları "finans"a taşımayı ÖNERME.
 URL'nin YOLUNA dik: /travel/, /sport/, /business/ gibi bölüm beslemeleri o konuya adanmıştır — yayının tamamına değil, BESLEMEYE bak.
 Yalnız GERÇEKTEN yanlış olanları bildir. İsim biçimi, eşanlam veya küçük tercih farkı için öneri YAPMA.
 

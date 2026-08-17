@@ -14,6 +14,7 @@
 // ulusal yayınlara verilir.
 import { createClient } from "@supabase/supabase-js";
 import { loadEnv, requireEnv } from "./env.mjs";
+import { guessCountry } from "./sources-map.mjs";
 
 loadEnv();
 const [SUPABASE_URL, SERVICE_ROLE] = requireEnv("SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY");
@@ -21,48 +22,11 @@ const DRY = process.argv.includes("--dry");
 const log = (...a) => console.log(new Date().toISOString(), ...a);
 
 // Ulusal alan adı → ülke. Bu TLD'ler yayının beat'ini güvenilir biçimde veriyor.
-const TLD_COUNTRY = {
-  ".com.tr": "Türkiye", ".net.tr": "Türkiye", ".org.tr": "Türkiye", ".tr": "Türkiye",
-  ".ee": "Estonia",
-  ".co.uk": "United Kingdom", ".uk": "United Kingdom",
-  ".de": "Germany", ".fr": "France", ".it": "Italy", ".es": "Spain",
-  ".nl": "Netherlands", ".pl": "Poland", ".ie": "Ireland", ".pt": "Portugal",
-  ".dk": "Denmark", ".fi": "Finland", ".ua": "Ukraine", ".ru": "Russia",
-  ".in": "India", ".ph": "Philippines", ".mx": "Mexico", ".au": "Australia",
-  ".com.au": "Australia", ".ca": "Canada", ".za": "South Africa", ".br": "Brazil",
-  ".jp": "Japan", ".kr": "South Korea", ".cn": "China", ".sg": "Singapore",
-  ".nz": "New Zealand", ".ng": "Nigeria", ".pk": "Pakistan", ".bd": "Bangladesh",
-  ".ir": "Iran", ".il": "Israel", ".eg": "Egypt", ".ke": "Kenya",
-  ".sa": "Saudi Arabia", ".tw": "Taiwan", ".th": "Thailand", ".vn": "Vietnam",
-  ".hu": "Hungary", ".hr": "Croatia", ".ar": "Argentina", ".id": "Indonesia",
-};
 
 // Genel TLD'li ama beat'i belirli bir ülke olan ulusal yayınlar.
-const HOST_COUNTRY = {
-  "webrazzi.com": "Türkiye",
-  "www.technopat.net": "Türkiye",
-  "www.teknoblog.com": "Türkiye",
-  "estonianworld.com": "Estonia",
-  "feeds.bbci.co.uk": "United Kingdom",
-  "www.theguardian.com": "United Kingdom",
-  "rss.dw.com": "Germany",
-};
 
 function hostOf(url) {
   try { return new URL(url).hostname; } catch { return ""; }
-}
-
-function guessCountry(url) {
-  const host = hostOf(url);
-  if (!host) return null;
-  if (HOST_COUNTRY[host]) return HOST_COUNTRY[host];
-  // En uzun eşleşen TLD kazansın (.com.tr, .tr'den önce).
-  const hit = Object.keys(TLD_COUNTRY)
-    .filter((t) => host.endsWith(t))
-    .sort((a, b) => b.length - a.length)[0];
-  if (hit) return TLD_COUNTRY[hit];
-  // Kalanlar küresel yayın sayılır — yanlış ülke yazmaktansa "Global".
-  return "Global";
 }
 
 async function main() {
