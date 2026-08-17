@@ -39,6 +39,8 @@ async function main() {
     byUrl.set(r.url, {
       url: r.url, name: r.name, section: r.section,
       region: r.region, country: r.country, lang: r.lang,
+      // Havuzdan gelenler rotasyona tabi; çekirdek aşağıda true'ya çekilir.
+      priority: false,
     });
   }
 
@@ -53,6 +55,10 @@ async function main() {
       region: f.region ?? existing?.region ?? null,
       country: existing?.country ?? null,
       lang: existing?.lang ?? null,
+      // Çekirdek her koşuda çekilir (rotasyona girmez) — bkz
+      // sql/20260817_source_priority.sql. ⚠️ Admin'den elle verilen öncelik
+      // bu import'ta sıfırlanır; kalıcı olması gereken kaynağı FEED_SEED'e ekle.
+      priority: true,
     });
   }
   log(`kürasyonlu çekirdek: ${FEED_SEED.length} (${before + FEED_SEED.length - byUrl.size} tanesi listede zaten vardı)`);

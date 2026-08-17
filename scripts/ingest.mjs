@@ -140,17 +140,29 @@ async function selectFeeds(sb) {
     log(`kaynak: INGEST_FEEDS env (${list.length})`);
     return list;
   }
-  const { data, error } = await sb
-    .from("sources")
-    .select("id,url,name,section,region,country,fail_count")
-    .eq("active", true)
-    // FIFO rotasyon: hiç çekilmemişler (null) en önde.
-    .order("last_fetched_at", { ascending: true, nullsFirst: true })
-    .limit(FEEDS_PER_RUN);
-  if (error) { log("sources okunamadı, çekirdeğe düşülüyor:", error.message); return FEED_SEED; }
-  if (!data?.length) { log("sources boş, çekirdeğe düşülüyor (scripts/import-sources.mjs koştur)"); return FEED_SEED; }
-  log(`kaynak: DB rotasyonu (${data.length})`);
-  return data;
+  const cols = "id,url,name,section,region,country,fail_count,priority";
+  // Çekirdek (priority) rotasyona TABİ DEĞİL: her koşuda çekilir. Havuz 1421'e
+  // çıkınca bunlar da kuyruğa girmişti ve 30 dk yerine ~12 saatte bir
+  // çekiliyorlardı — son dakika haberi yarım gün gecikiyordu.
+  const [core, rest] = await Promise.all([
+    sb.from("sources").select(cols).eq("active", true).eq("priority", true),
+    sb.from("sources").select(cols).eq("active", true).eq("priority", false)
+      // FIFO rotasyon: hiç çekilmemişler (null) en önde.
+      .order("last_fetched_at", { ascending: true, nullsFirst: true })
+      .limit(FEEDS_PER_RUN),
+  ]);
+  if (core.error || rest.error) {
+    log("sources okunamadı, çekirdeğe düşülüyor:", (core.error || rest.error).message);
+    return FEED_SEED.map((f) => ({ ...f, isCore: true }));
+  }
+  const coreRows = (core.data || []).map((f) => ({ ...f, isCore: true }));
+  const restRows = (rest.data || []).map((f) => ({ ...f, isCore: false }));
+  if (!coreRows.length && !restRows.length) {
+    log("sources boş, çekirdeğe düşülüyor (scripts/import-sources.mjs koştur)");
+    return FEED_SEED.map((f) => ({ ...f, isCore: true }));
+  }
+  log(`kaynak: çekirdek ${coreRows.length} (her koşuda) + rotasyon ${restRows.length}`);
+  return [...coreRows, ...restRows];
 }
 
 // Çekim sonuçlarını kaynaklara yazar: rotasyon saati, hata sayacı, ölü feed kapatma.
@@ -232,9 +244,26 @@ async function main() {
   await recordFeedStats(sb, feeds, stats);
 
   // round-robin: her feed'den sırayla (görselli feed'ler de paya girsin)
+  const roundRobin = (lists) => {
+    const out = [];
+    for (let i = 0; ; i++) {
+      let any = false;
+      for (const arr of lists) { if (arr[i]) { out.push(arr[i]); any = true; } }
+      if (!any) break;
+    }
+    return out;
+  };
+  // İki şerit ayrı ayrı round-robin'lenip 1:1 harmanlanır. Düz birleştirme
+  // yapılsaydı çekirdeğin ~55 adayı rewrite bütçesini tek başına bitirir,
+  // rotasyon havuzu hiç pay alamazdı (yani 1366 kaynağı eklemenin anlamı kalmazdı).
+  const coreCands = roundRobin(perFeed.filter((_, i) => feeds[i].isCore));
+  const restCands = roundRobin(perFeed.filter((_, i) => !feeds[i].isCore));
   const candidates = [];
-  for (let i = 0; ; i++) { let any = false; for (const arr of perFeed) { if (arr[i]) { candidates.push(arr[i]); any = true; } } if (!any) break; }
-  log(`aday: ${candidates.length}, tur limiti ${MAX_PER_RUN}`);
+  for (let i = 0; i < Math.max(coreCands.length, restCands.length); i++) {
+    if (coreCands[i]) candidates.push(coreCands[i]);
+    if (restCands[i]) candidates.push(restCands[i]);
+  }
+  log(`aday: ${candidates.length} (çekirdek ${coreCands.length} + rotasyon ${restCands.length}), tur limiti ${MAX_PER_RUN}`);
 
   let inserted = 0;
   // Tur başına bölüm kotası. Kaynak havuzu 1000+'e çıkınca gündem kaynakları
