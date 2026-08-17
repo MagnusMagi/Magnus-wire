@@ -53,7 +53,10 @@ async function main() {
       category: existing?.category ?? null,
       // Kürasyonlu değer varsa o kazanır; yoksa markdown'dan geleni koru.
       section: f.section ?? existing?.section ?? null,
-      region: f.region ?? existing?.region ?? null,
+      // Bölgesiz bırakılmaz: bölge YEDEK olarak kullanılıyor (AI kararsız
+      // kalınca buraya düşülüyor), null olsaydı haber hiçbir bölge sayfasına
+      // girmezdi. Kürasyonlu küresel feed'ler "dunya"ya düşer.
+      region: f.region ?? existing?.region ?? "dunya",
       country: existing?.country ?? null,
       lang: existing?.lang ?? null,
       // Çekirdek her koşuda çekilir (rotasyona girmez) — bkz

@@ -33,11 +33,19 @@ export const TOPICS: Section[] = [
   { slug: "deprem", kind: "topic", label: { tr: "Deprem", en: "Earthquakes", et: "Maavärinad" } },
 ];
 
+// Bölgeler iki katmanlı: önce ilgi odağımızdaki ülkeler (Türkiye, Estonya, ABD),
+// sonra kıtalar. DAHA SPESİFİK OLAN KAZANIR — bir ABD haberi `abd`ye gider,
+// `amerika`ya değil; Türkiye haberi `turkiye`ye gider, `avrupa`ya değil.
+// `dunya` yalnız gerçekten küresel/ülkesiz haberler için yedek olarak kalır.
 export const REGIONS: Section[] = [
-  { slug: "estonya", kind: "region", label: { tr: "Estonya", en: "Estonia", et: "Eesti" } },
   { slug: "turkiye", kind: "region", label: { tr: "Türkiye", en: "Turkey", et: "Türgi" } },
+  { slug: "estonya", kind: "region", label: { tr: "Estonya", en: "Estonia", et: "Eesti" } },
   { slug: "avrupa", kind: "region", label: { tr: "Avrupa", en: "Europe", et: "Euroopa" } },
   { slug: "abd", kind: "region", label: { tr: "ABD", en: "USA", et: "USA" } },
+  { slug: "asya", kind: "region", label: { tr: "Asya", en: "Asia", et: "Aasia" } },
+  { slug: "amerika", kind: "region", label: { tr: "Amerika", en: "Americas", et: "Ameerika" } },
+  { slug: "afrika", kind: "region", label: { tr: "Afrika", en: "Africa", et: "Aafrika" } },
+  { slug: "okyanusya", kind: "region", label: { tr: "Okyanusya", en: "Oceania", et: "Okeaania" } },
   { slug: "dunya", kind: "region", label: { tr: "Dünya", en: "World", et: "Maailm" } },
 ];
 

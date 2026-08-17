@@ -52,11 +52,22 @@ const REGION_EXACT = {
   "United States": "abd",
 };
 
-const EUROPE = new Set([
-  "France", "Germany", "Italy", "Spain", "Poland", "Netherlands", "Ireland",
-  "Portugal", "Denmark", "Finland", "Croatia", "Hungary", "Ukraine",
-  "United Kingdom",
-]);
+// Kıta haritası. Ülke düzeyindeki üç bölge (Türkiye, Estonya, ABD) yukarıdaki
+// REGION_EXACT'te ve DAHA SPESİFİK oldukları için önce onlara bakılır.
+const CONTINENT = {
+  avrupa: ["France", "Germany", "Italy", "Spain", "Poland", "Netherlands",
+    "Ireland", "Portugal", "Denmark", "Finland", "Croatia", "Hungary",
+    "Ukraine", "United Kingdom", "Russia"],
+  asya: ["India", "Philippines", "Japan", "China", "South Korea", "Singapore",
+    "Indonesia", "Thailand", "Vietnam", "Bangladesh", "Pakistan", "Iran",
+    "Israel", "Saudi Arabia", "Taiwan", "Hong Kong SAR China", "Middle East"],
+  amerika: ["Mexico", "Brazil", "Canada", "Argentina"],
+  afrika: ["South Africa", "Nigeria", "Egypt", "Kenya"],
+  okyanusya: ["Australia", "New Zealand"],
+};
+const COUNTRY_CONTINENT = new Map(
+  Object.entries(CONTINENT).flatMap(([region, countries]) => countries.map((c) => [c, region])),
+);
 
 // "Genel" ve "Dünya" başlıkları belirli bir ülkenin yayını değil, küresel
 // kaynaklar. Ülke olarak "Global" işaretlenirler (null DEĞİL): ingest bu bilgiyi
@@ -70,10 +81,11 @@ export function mapCountry(country) {
 // Bölge burada YEDEK üretir, zorlama değil: ingest önce AI'nın haber içeriğinden
 // çıkardığı bölgeye bakar, yalnız o kararsız kalınca buraya düşer.
 export function mapRegion(country) {
+  // Spesifik ülke bölgeleri kıtadan önce gelir (ABD → abd, Amerika DEĞİL).
   if (REGION_EXACT[country]) return REGION_EXACT[country];
-  if (EUROPE.has(country)) return "avrupa";
-  // Küresel kaynaklar ve kendi sayfası olmayan 28 ülke (India, Philippines,
-  // Mexico, Australia...) "dunya" bölgesine düşer; ülke adı etiket olarak kalır.
+  const continent = COUNTRY_CONTINENT.get(country);
+  if (continent) return continent;
+  // Küresel kaynaklar ve haritada olmayan ülkeler "dunya" yedeğine düşer.
   return "dunya";
 }
 

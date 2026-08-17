@@ -58,7 +58,8 @@ const TOPICS = {
   "savunma": "Savunma", "otomobil": "Otomobil", "oyun": "Oyun", "spor": "Spor",
   "kultur": "Kültür", "tasarim": "Tasarım", "yasam": "Yaşam",
 };
-const REGIONS = new Set(["estonya", "turkiye", "avrupa", "abd", "dunya"]);
+// site.ts'teki REGIONS ile aynı küme olmalı.
+const REGIONS = new Set(["turkiye", "estonya", "avrupa", "abd", "asya", "amerika", "afrika", "okyanusya", "dunya"]);
 
 function log(...a) { console.log(new Date().toISOString(), ...a); }
 function slugify(s) {
@@ -140,7 +141,7 @@ async function rewrite(item, source = {}) {
   const originLine = source.country && source.country !== "Global"
     ? `Bu kaynak ${source.country} yayınıdır. Bu YALNIZCA bağlamdır — bölgeyi haberin KONUSUNA göre seç, kaynağın ülkesini otomatik kopyalama. Haber başka bir ülkeyi anlatıyorsa o ülkenin bölgesini yaz.`
     : `Bu kaynak küresel bir yayındır; bölgeyi haberin konusundan çıkar.`;
-  const user = `Kaynak: ${source.name || item.title}\n${originLine}\n\nKaynak başlık: ${item.title}\nKaynak metin: ${snippet}\n\nGövdeyi SADECE Türkçe yaz. "en" ve "et" için yalnızca başlık ve spot'un çevirisini ver — gövde YAZMA. SADECE şu JSON'u döndür:\n{\n "section": "şunlardan biri: ${Object.keys(TOPICS).join(", ")}",\n "region": "şunlardan TAM BİRİ: estonya (Estonya), turkiye (Türkiye), avrupa (Avrupa ülkeleri), abd (ABD), dunya (BUNLARIN DIŞINDAKİ HER YER — Avustralya, Japonya, Hindistan, Brezilya, Çin, Orta Doğu, Afrika ve küresel/ülkesiz haberler)",\n "tags": ["2-4 küçük harf etiket"],\n "tr": {"title":"≤90 karakter", "summary":"tek cümle spot", "body":"${bodyRule}", "keyFacts":["ZORUNLU, 3-5 madde — ${factsRule}"]},\n "en": {"title":"tr.title'ın İngilizcesi", "summary":"tr.summary'nin İngilizcesi"},\n "et": {"title":"tr.title'ın Estoncası", "summary":"tr.summary'nin Estoncası"}\n}`;
+  const user = `Kaynak: ${source.name || item.title}\n${originLine}\n\nKaynak başlık: ${item.title}\nKaynak metin: ${snippet}\n\nGövdeyi SADECE Türkçe yaz. "en" ve "et" için yalnızca başlık ve spot'un çevirisini ver — gövde YAZMA. SADECE şu JSON'u döndür:\n{\n "section": "şunlardan biri: ${Object.keys(TOPICS).join(", ")}",\n "region": "haberin KONUSU hangi coğrafyaysa şunlardan TAM BİRİ — DAHA SPESİFİK OLANI SEÇ: turkiye (Türkiye), estonya (Estonya), abd (ABD), avrupa (diğer Avrupa ülkeleri), asya (Japonya, Çin, Hindistan, Orta Doğu, Güneydoğu Asya...), amerika (ABD DIŞINDAKİ Amerika: Kanada, Meksika, Brezilya, Arjantin...), afrika (Afrika ülkeleri), okyanusya (Avustralya, Yeni Zelanda), dunya (belirli bir ülkeyle ilgili olmayan küresel haberler)",\n "tags": ["2-4 küçük harf etiket"],\n "tr": {"title":"≤90 karakter", "summary":"tek cümle spot", "body":"${bodyRule}", "keyFacts":["ZORUNLU, 3-5 madde — ${factsRule}"]},\n "en": {"title":"tr.title'ın İngilizcesi", "summary":"tr.summary'nin İngilizcesi"},\n "et": {"title":"tr.title'ın Estoncası", "summary":"tr.summary'nin Estoncası"}\n}`;
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_API_KEY}` },
