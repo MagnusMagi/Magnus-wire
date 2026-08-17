@@ -1,4 +1,11 @@
 <svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-  <rect width="64" height="64" fill="#1a1916"/>
-  <text x="32" y="34" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="16.5" font-weight="700" letter-spacing="0.5" fill="#edebe4" text-anchor="middle" dominant-baseline="central">WIRE</text>
+  <!-- Favicon: paper zemin + ink rozet, diğer ikonlarla (apple-icon, manifest
+       192/512) aynı palet ve aynı rozet formu.
+       ⚠️ "WIRE" yazısı DENENDİ ve 16px'te okunmuyordu (4 harf ~2px'e düşüyor);
+       favicon tek harfe indirildi. Tam wordmark büyük ikonlarda duruyor. -->
+  <rect width="64" height="64" fill="#edebe4"/>
+  <rect x="10" y="10" width="44" height="44" fill="#1a1916"/>
+  <text x="32" y="33" font-family="ui-monospace, Menlo, Consolas, monospace"
+        font-size="30" font-weight="700" fill="#edebe4"
+        text-anchor="middle" dominant-baseline="central">W</text>
 </svg>
