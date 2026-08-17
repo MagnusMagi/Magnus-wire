@@ -10,15 +10,15 @@ export function Topbar({ locale }: { locale: Locale }) {
         <span className="hidden min-[375px]:block"><LiveDate locale={locale} /></span>
         <nav aria-label="links" className="flex items-center gap-1.5 sm:gap-3">
           <span className="flex items-center gap-1 sm:gap-2">
-            <Link href={`/${locale}/bugun`} className="inline-flex items-center h-8 px-0.5 sm:px-1 hover:text-white font-bold text-signal">{t(locale, "todayTitle")}</Link>
-            <span className="hidden sm:inline text-[#5a574e]">/</span>
+            <Link href={`/${locale}/bugun`} className="inline-flex items-center h-8 px-0.5 sm:px-1 hover:text-white font-bold text-signal-l">{t(locale, "todayTitle")}</Link>
+            <span aria-hidden className="hidden sm:inline text-[#5a574e]">/</span>
             <Link href={`/${locale}/hakkimizda`} className="hidden sm:inline-flex items-center h-8 px-0.5 sm:px-1 hover:text-white">{t(locale, "about")}</Link>
-            <span className="hidden sm:inline text-[#5a574e]">/</span>
+            <span aria-hidden className="hidden sm:inline text-[#5a574e]">/</span>
             <a href={`/${locale}/rss.xml`} className="hidden sm:inline-flex items-center h-8 px-0.5 sm:px-1 hover:text-white">RSS</a>
-            <span className="text-[#5a574e]">/</span>
+            <span aria-hidden className="text-[#5a574e]">/</span>
             <Link href={`/${locale}/okuma-listesi`} className="inline-flex items-center h-8 px-0.5 sm:px-1 hover:text-white whitespace-nowrap">{t(locale, "readingList")}</Link>
           </span>
-          <span className="text-[#5a574e]">·</span>
+          <span aria-hidden className="text-[#5a574e]">·</span>
           <LocaleSwitcher locale={locale} />
         </nav>
       </div>

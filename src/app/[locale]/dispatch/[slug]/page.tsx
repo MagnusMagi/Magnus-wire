@@ -85,9 +85,9 @@ export default async function DispatchPage({ params }: { params: Promise<{ local
       <main className="mx-auto max-w-[1240px] px-6 pt-7 pb-18">
         <nav aria-label="crumb" className="max-w-[760px] mx-auto mb-5 font-mono text-[11.5px] tracking-wide text-ink-3 uppercase">
           <Link href={`/${locale}`} className="text-wire">{t(locale, "feed")}</Link>
-          <span className="mx-[7px] text-line">›</span>
+          <span aria-hidden className="mx-[7px] text-line">›</span>
           <Link href={sectionHref(locale, d.section)} className="text-wire">{sectionLabel(d.section, locale)}</Link>
-          <span className="mx-[7px] text-line">›</span>
+          <span aria-hidden className="mx-[7px] text-line">›</span>
           <span className="text-ink-2">{d.title}</span>
         </nav>
 

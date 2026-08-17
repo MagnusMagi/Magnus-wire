@@ -7,13 +7,21 @@
 @theme {
   --color-ink:      #1a1916;
   --color-ink-2:    #54514a;
-  --color-ink-3:    #8a8578;
+  /* WCAG AA: eski #8a8578 paper üzerinde 3.08 idi (eşik 4.5). Bu token zaman
+     damgası, kaynak satırı, dipnot gibi HER yerde kullanıldığı için tek başına
+     denetimdeki ihlallerin çoğunu oluşturuyordu. Yeni değer 4.8:1. */
+  --color-ink-3:    #6b675c;
   --color-paper:    #edebe4;
   --color-panel:    #e4e1d8;
   --color-line:     #cfcbbe;
   --color-wire:     #1c6e68;
   --color-wire-d:   #14524d;
-  --color-signal:   #d2400c;
+  /* ⚠️ signal iki zeminde kullanılıyor ve ihtiyaçları TERS:
+     paper üzerinde koyu olmalı (eski #d2400c = 3.93), ink zemin üzerinde
+     (topbar) ise açık olmalı (eski değer orada zaten 3.70 idi ve koyulaştırmak
+     daha da düşürürdü). Bu yüzden ikiye ayrıldı. */
+  --color-signal:   #b93809;   /* paper üzerinde 4.6:1 */
+  --color-signal-l: #f0834a;   /* ink zemin üzerinde 6.0:1 (topbar/koyu şerit) */
   --color-signal-d: #a8330a;
 
   --font-mono: Menlo, "SF Mono", "Roboto Mono", "DejaVu Sans Mono", ui-monospace, monospace;
@@ -44,7 +52,9 @@ body {
   a { color: inherit; text-decoration: none; }
 }
 ::selection { background: var(--color-signal); color: #fff; }
-:focus-visible { outline: none; }
+/* WCAG 2.4.7 (AA): odak göstergesi görünür OLMALI. Daha önce outline:none
+   yapılmıştı; klavyeyle gezen kullanıcı nerede olduğunu göremiyordu. */
+:focus-visible { outline: 2px solid var(--color-wire); outline-offset: 2px; }
 
 /* ============================================================
    İmza yardımcıları + hareket

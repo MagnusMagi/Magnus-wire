@@ -30,7 +30,7 @@ export function SourceLink({
       className="group inline-flex items-center gap-3 border border-line bg-panel px-3.5 py-2.5 hover:border-signal transition-colors">
       <img src={fav} alt="" width={20} height={20} className="rounded-[3px]" />
       <span className="flex flex-col leading-tight">
-        <span className="font-mono text-[10px] uppercase tracking-widest text-ink-3">{t(locale, "source")}</span>
+        <span className="font-mono text-[10px] uppercase tracking-widest text-ink-2">{t(locale, "source")}</span>
         <span className="text-[13.5px] font-bold">{label}</span>
         <span className="font-mono text-[10.5px] text-wire">{host}</span>
       </span>

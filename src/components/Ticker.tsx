@@ -13,7 +13,7 @@ export function Ticker({ items, locale }: { items: { title: string; slug: string
         <div className="wire-marquee inline-flex whitespace-nowrap py-[7px]">
           {list.map((it, i) => (
             <Link key={i} href={`/${locale}/dispatch/${it.slug}`} className="px-[26px] relative hover:text-signal transition-colors">
-              <span className="text-signal mr-3.5">▸</span>{it.title}
+              <span aria-hidden className="text-signal-l mr-3.5">▸</span>{it.title}
             </Link>
           ))}
         </div>

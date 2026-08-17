@@ -28,7 +28,7 @@ export function LiveDate({ locale }: { locale: Locale }) {
 
   return (
     <span className="uppercase text-[#b4b0a3] whitespace-nowrap" suppressHydrationWarning>
-      <span className="text-signal">◷ </span>
+      <span className="text-signal-l">◷ </span>
       <span className="lg:hidden">{d.short || " "}</span>
       <span className="hidden lg:inline">{d.full || " "}</span>
     </span>
