@@ -116,7 +116,9 @@ async function rewrite(item) {
   });
   if (!res.ok) throw new Error(`OpenAI ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const o = JSON.parse((await res.json()).choices[0].message.content);
-  if (!TOPICS[o.section]) o.section = "yapay-zeka";
+  // Sınıflandırılamayan öğe "gundem"e düşer. (Eskiden "yapay-zeka" idi; havuz
+  // teknoloji dışına açılınca alakasız haberleri AI bölümüne dolduruyordu.)
+  if (!TOPICS[o.section]) o.section = "gundem";
   o.region = REGIONS.has(o.region) ? o.region : null;
   o.tags = Array.isArray(o.tags) ? o.tags.slice(0, 4).map((t) => slugify(String(t))) : [];
   for (const l of ["tr", "en", "et"]) {
