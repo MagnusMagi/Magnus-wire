@@ -10,8 +10,18 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
-const MAX_PER_RUN = Number(process.env.INGEST_MAX || 24);
-const KEEP = Number(process.env.INGEST_KEEP || 200);
+// ⚠️ Hacim, sitenin tuttuğu içerikle orantılı olmalı. Eskiden tur başına 24 ×
+// 48 koşu = günde ~1.000 haber üretiliyordu ama site yalnız KEEP kadarını
+// tutuyordu: ölçüldü, bir günde 422 haber eklenip 422 haber silindi — ödenen
+// içeriğin ~%80'i aynı gün çöpe gidiyordu. Az üret, çok tut.
+const MAX_PER_RUN = Number(process.env.INGEST_MAX || 6);
+// Global tavan (emniyet supabı). Asıl budama bölüm-başına yapılır.
+const KEEP = Number(process.env.INGEST_KEEP || 400);
+// Bölüm başına tutulan haber sayısı. Global budama gündem'in (havuzun ~%37'si)
+// vitrini kaplamasına yol açıyordu: 200 haberin 91'i gundem'ken oyun/otomobil/
+// savunma/yaşam bölümleri TAMAMEN boştu. Artık her bölüm kendi penceresinde
+// yarışıyor → niş bölümler dolu kalıyor, gündem kendi kendini deviriyor.
+const KEEP_PER_SECTION = Number(process.env.INGEST_KEEP_PER_SECTION || 25);
 
 // Kaynak havuzu 1000+ feed'e çıktığı için hepsi her koşuda çekilemez:
 // - FEEDS_PER_RUN: bu koşuda çekilecek kaynak sayısı. En uzun süredir
@@ -297,10 +307,13 @@ async function main() {
   // Tur başına bölüm kotası. Kaynak havuzu 1000+'e çıkınca gündem kaynakları
   // (havuzun ~%37'si) her turu doldurabiliyor → HER bölüme genel bir tavan,
   // yüksek hacimli iki bölüme daha sıkısı. Niş bölümler böylece slot bulur.
-  const DEFAULT_CAP = Number(process.env.INGEST_SECTION_CAP || 6);
+  // Kota MAX_PER_RUN'a göre ölçeklenir: sabit 6 olsaydı 6'lık bir turda kota
+  // hiç bağlayıcı olmaz, tek koşu tamamen gündem olabilirdi. ~dörtte bir kuralı
+  // her turda en az 3-4 farklı bölüm garantiler.
+  const DEFAULT_CAP = Number(process.env.INGEST_SECTION_CAP || Math.max(2, Math.ceil(MAX_PER_RUN / 4)));
   const SECTION_CAPS = Object.fromEntries(Object.keys(TOPICS).map((s) => [s, DEFAULT_CAP]));
-  SECTION_CAPS.gundem = Number(process.env.INGEST_GUNDEM_CAP || 5);
-  SECTION_CAPS.finans = Number(process.env.INGEST_FINANS_CAP || 5);
+  SECTION_CAPS.gundem = Number(process.env.INGEST_GUNDEM_CAP || DEFAULT_CAP);
+  SECTION_CAPS.finans = Number(process.env.INGEST_FINANS_CAP || DEFAULT_CAP);
   const secCount = Object.fromEntries(Object.keys(TOPICS).map((s) => [s, 0]));
   const seenTitles = (existing || []).map((r) => normTitle(r.title)).filter((t) => t.length);
 
@@ -355,8 +368,37 @@ async function main() {
   const { data: newest } = await sb.from("dispatches").select("id").order("published_at", { ascending: false }).limit(1);
   if (newest?.[0]) { await sb.from("dispatches").update({ live: false }).neq("id", newest[0].id); await sb.from("dispatches").update({ live: true }).eq("id", newest[0].id); }
 
-  const { data: all } = await sb.from("dispatches").select("id").order("published_at", { ascending: false });
-  if (all && all.length > KEEP) { const drop = all.slice(KEEP).map((r) => r.id); const { error } = await sb.from("dispatches").delete().in("id", drop); if (!error) log(`budama: ${drop.length}`); }
+  // Budama: önce BÖLÜM BAŞINA, sonra global tavan.
+  // Tek global tavan gündem'in vitrini kaplamasına yol açıyordu (200 haberin
+  // 91'i gundem, oyun/otomobil/savunma/yaşam ise tamamen boş). Her bölüm artık
+  // kendi penceresinde yarışıyor.
+  const { data: all } = await sb.from("dispatches")
+    .select("id,section")
+    .order("published_at", { ascending: false });
+  if (all?.length) {
+    const perSection = {};
+    const drop = [];
+    const survivors = [];
+    for (const r of all) {  // published_at DESC → her bölümün en yenisi önce
+      const n = (perSection[r.section] = (perSection[r.section] || 0) + 1);
+      if (n > KEEP_PER_SECTION) drop.push(r.id);
+      else survivors.push(r.id);
+    }
+    const bolumBasina = drop.length;
+    // Bölüm kotalarından sonra hâlâ tavanı aşıyorsa en eskiler gider.
+    if (survivors.length > KEEP) drop.push(...survivors.slice(KEEP));
+    if (drop.length) {
+      // ⚠️ Parça parça sil: `in` filtresi URL'e gömülüyor, birkaç yüz id
+      // PostgREST'in URL sınırını aşabiliyor.
+      let deleted = 0;
+      for (let i = 0; i < drop.length; i += 100) {
+        const { error } = await sb.from("dispatches").delete().in("id", drop.slice(i, i + 100));
+        if (error) { log("budama hatası", error.message); break; }
+        deleted += Math.min(100, drop.length - i);
+      }
+      log(`budama: ${deleted} (bölüm kotası ${bolumBasina}, global tavan ${drop.length - bolumBasina})`);
+    }
+  }
 
   if (process.env.REVALIDATE_SECRET) {
     try { const r = await fetch("http://127.0.0.1:3360/api/revalidate", { method: "POST", headers: { "x-revalidate-secret": process.env.REVALIDATE_SECRET } }); log("revalidate:", r.status); } catch (e) { log("revalidate hatası", e.message); }
