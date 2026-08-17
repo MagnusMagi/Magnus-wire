@@ -49,6 +49,14 @@ export function sectionKind(slug: string): SectionKind | null {
   return ALL_SECTIONS.find((x) => x.slug === slug)?.kind ?? null;
 }
 
+// Bazı içerik bölümlerinin kendi sayfası yok; canonical sayfaya yönlendirilir.
+// (finans → borsa: next.config'teki 308 redirect + Borsa'daki "Piyasa Haberleri").
+// İç linkler doğrudan hedefe işaret etsin ki redirect hop'u olmasın.
+const SECTION_PAGE_ALIAS: Record<string, string> = { finans: "borsa" };
+export function sectionHref(locale: Locale, slug: string): string {
+  return `/${locale}/${SECTION_PAGE_ALIAS[slug] ?? slug}`;
+}
+
 // Kurumsal alt menü (slug + i18n anahtarı)
 export const FOOTER_LINKS: { slug: string; key: string }[] = [
   { slug: "hakkimizda", key: "about" },

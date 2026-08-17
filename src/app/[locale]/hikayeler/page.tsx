@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { CatNav } from "@/components/CatNav";
 import { SourceLink } from "@/components/SourceLink";
 import { getStories } from "@/lib/clusters";
-import { sectionLabel } from "@/lib/site";
+import { sectionLabel, sectionHref } from "@/lib/site";
 import { LOCALES, t, isLocale, type Locale } from "@/lib/i18n";
 import { altLanguages } from "@/lib/seo";
 
@@ -39,7 +39,7 @@ export default async function StoriesPage({ params }: { params: Promise<{ locale
               <section key={s.key} className="min-w-0">
                 <div className="flex items-center gap-2 mb-3">
                   <span className="font-mono text-[10.5px] font-bold uppercase tracking-wide text-paper bg-signal px-2 py-0.5">{s.items.length} {t(locale, "updates")}</span>
-                  <Link href={`/${locale}/${s.section}`} className="font-mono text-[11px] uppercase tracking-wide text-ink-3 hover:text-wire">{sectionLabel(s.section, locale)}</Link>
+                  <Link href={sectionHref(locale, s.section)} className="font-mono text-[11px] uppercase tracking-wide text-ink-3 hover:text-wire">{sectionLabel(s.section, locale)}</Link>
                 </div>
                 <ol className="relative m-0 p-0 list-none border-l border-line ml-2">
                   {s.items.map((d, i) => (

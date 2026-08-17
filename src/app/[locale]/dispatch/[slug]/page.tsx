@@ -7,7 +7,7 @@ import { CatNav } from "@/components/CatNav";
 import { ArticleImage } from "@/components/ArticleImage";
 import { mdxComponents } from "@/components/mdx";
 import { getDispatch, getDispatches } from "@/lib/dispatches";
-import { sectionLabel } from "@/lib/site";
+import { sectionLabel, sectionHref } from "@/lib/site";
 import { SourceLink } from "@/components/SourceLink";
 import { ReadingProgress } from "@/components/ReadingProgress";
 import { ViewBeacon } from "@/components/ViewBeacon";
@@ -77,7 +77,7 @@ export default async function DispatchPage({ params }: { params: Promise<{ local
         <nav aria-label="crumb" className="max-w-[760px] mx-auto mb-5 font-mono text-[11.5px] tracking-wide text-ink-3 uppercase">
           <Link href={`/${locale}`} className="text-wire">{t(locale, "feed")}</Link>
           <span className="mx-[7px] text-line">›</span>
-          <Link href={`/${locale}/${d.section}`} className="text-wire">{sectionLabel(d.section, locale)}</Link>
+          <Link href={sectionHref(locale, d.section)} className="text-wire">{sectionLabel(d.section, locale)}</Link>
           <span className="mx-[7px] text-line">›</span>
           <span className="text-ink-2">{d.title}</span>
         </nav>
