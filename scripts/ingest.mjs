@@ -1,20 +1,9 @@
 // MagiWire — RSS → OpenAI (TR/EN/ET + bölge) → Supabase
 import Parser from "rss-parser";
+import { FEED_SEED } from "./feeds.seed.mjs";
 import { createClient } from "@supabase/supabase-js";
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
-const __dir = dirname(fileURLToPath(import.meta.url));
+import { loadEnv } from "./env.mjs";
 
-function loadEnv() {
-  try {
-    const txt = readFileSync(join(__dir, "..", ".env.local"), "utf8");
-    for (const line of txt.split("\n")) {
-      const m = line.match(/^([A-Z_]+)=(.*)$/);
-      if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^['"]|['"]$/g, "");
-    }
-  } catch {}
-}
 loadEnv();
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -24,79 +13,31 @@ const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const MAX_PER_RUN = Number(process.env.INGEST_MAX || 24);
 const KEEP = Number(process.env.INGEST_KEEP || 200);
 
-// Feed başına SABİT bölge: Türkçe kaynaklar→turkiye, Eston kaynaklar→estonya
-// (AI'nın içerikten bölge tahminini override eder). global teknoloji→region yok.
-// global/TR/EE interleave: kısa turlarda (round-robin) her bölge paya girsin.
-// section sabit olan feed'ler "gundem" (genel/güncel haber); diğerleri AI'nın
-// seçtiği teknoloji bölümüne düşer. global/TR/EE/gündem interleave.
-const FEED_LIST = [
-  // ── 1. tur: her kategori/bölgeden birer kaynak (round-robin'in ilk turu bunları örnekler) ──
-  { url: "https://techcrunch.com/feed/" },                                            // genel tech (AI sınıflar)
-  { url: "https://venturebeat.com/category/ai/feed/", section: "yapay-zeka" },         // pür AI → yapay-zeka (forced; AI sınıfı yoksa bu kategori boş kalıyordu)
-  { url: "https://www.tomshardware.com/feeds/all", section: "donanim" },               // pür donanım → donanim (forced)
-  { url: "https://www.ntv.com.tr/gundem.rss", region: "turkiye", section: "gundem" },
-  { url: "https://www.coindesk.com/arc/outboundfeeds/rss/", section: "kripto" },
-  { url: "https://www.nasa.gov/news-release/feed/", section: "uzay" },
-  { url: "https://www.bleepingcomputer.com/feed/", section: "siber" },
-  { url: "https://dev.to/feed", section: "yazilim" },
-  { url: "https://www.sciencedaily.com/rss/all.xml", section: "bilim" },
-  { url: "https://www.eu-startups.com/feed/", region: "avrupa", section: "finans" },
-  { url: "https://feeds.bbci.co.uk/news/business/rss.xml", section: "finans" },
-  { url: "https://shiftdelete.net/feed", region: "turkiye" },
-  { url: "https://news.err.ee/rss", region: "estonya" },
-  { url: "https://www.err.ee/rss", region: "estonya" },               // ERR Estonca ana akış (öne çıkan/top haberler)
-  { url: "https://www.theverge.com/rss/index.xml" },
-  { url: "https://webrazzi.com/feed/", region: "turkiye", section: "finans" },
-  { url: "https://tehnika.postimees.ee/rss", region: "estonya" },
+// Kaynak havuzu 1000+ feed'e çıktığı için hepsi her koşuda çekilemez:
+// - FEEDS_PER_RUN: bu koşuda çekilecek kaynak sayısı. En uzun süredir
+//   çekilmemişler önce gelir (FIFO rotasyon) → havuz zamanla tamamen dolaşılır.
+//   MAX_PER_RUN'ın biraz üstünde tutulur; round-robin'de baştaki kaynaklar
+//   slot alır, fazlası yalnız yedek/çeşitlilik payıdır. Çok büyütmek boşa
+//   ağ trafiği demek (OpenAI maliyeti MAX_PER_RUN'a bağlı, feed sayısına değil).
+// - CONCURRENCY: fetch havuzu. Sıralı fetch 1000+ feed'de cron aralığını aşardı.
+const FEEDS_PER_RUN = Number(process.env.INGEST_FEEDS_PER_RUN || 60);
+const CONCURRENCY = Number(process.env.INGEST_CONCURRENCY || 12);
+// Üst üste bu kadar hata veren kaynak otomatik kapatılır (ölü feed'ler havuzu
+// tıkamasın). Başarılı çekimde sayaç sıfırlanır.
+const FAIL_LIMIT = Number(process.env.INGEST_FAIL_LIMIT || 10);
 
-  // ── 2. tur: ikinci kaynaklar ──
-  { url: "https://cointelegraph.com/rss", section: "kripto" },
-  { url: "https://www.space.com/feeds/all", section: "uzay" },
-  { url: "https://feeds.feedburner.com/TheHackersNews", section: "siber" },
-  { url: "https://github.blog/feed/", section: "yazilim" },
-  { url: "https://www.newscientist.com/feed/home/", section: "bilim" },
-  { url: "https://techcrunch.com/category/startups/feed/", section: "finans" },
-  { url: "https://www.bloomberght.com/rss", region: "turkiye", section: "finans" },
-  { url: "https://www.webtekno.com/rss.xml", region: "turkiye" },
-  { url: "https://feeds.bbci.co.uk/news/world/rss.xml", section: "gundem" },
-  { url: "https://feeds.arstechnica.com/arstechnica/technology-lab" },
-  { url: "https://the-decoder.com/feed/", section: "yapay-zeka" },                     // 2. yapay-zeka kaynağı (forced)
-  { url: "https://estonianworld.com/feed/", region: "estonya" },
-  { url: "https://www.wired.com/feed/rss" },
-  { url: "https://www.aa.com.tr/tr/rss/default?cat=guncel", region: "turkiye", section: "gundem" },
-  { url: "https://www.dunya.com/rss", region: "turkiye", section: "finans" },
-  { url: "https://www.donanimhaber.com/rss/tum/", region: "turkiye", section: "donanim" }, // 2. donanım kaynağı (TR, forced)
-  { url: "https://news.postimees.ee/rss", region: "estonya" },
-  { url: "https://www.postimees.ee/rss", region: "estonya" },
-
-  // ── 3. tur: üçüncü kaynaklar / derinlik ──
-  { url: "https://decrypt.co/feed", section: "kripto" },
-  { url: "https://phys.org/rss-feed/space-news/", section: "uzay" },
-  { url: "https://krebsonsecurity.com/feed/", section: "siber" },
-  { url: "https://phys.org/rss-feed/", section: "bilim" },
-  { url: "https://sifted.eu/feed", region: "avrupa", section: "finans" },
-  { url: "https://hnrss.org/frontpage" },
-  { url: "https://www.engadget.com/rss.xml" },
-  { url: "https://www.trthaber.com/manset_articles.rss", region: "turkiye", section: "gundem" },
-  { url: "https://www.cnbc.com/id/100003114/device/rss/rss.html", section: "finans" },
-  { url: "https://www.technopat.net/feed/", region: "turkiye" },
-  { url: "https://feeds.bbci.co.uk/turkce/rss.xml", region: "turkiye", section: "gundem" },
-  { url: "https://www.aripaev.ee/rss", region: "estonya", section: "finans" },
-  { url: "https://www.geenius.ee/feed/", region: "estonya" },
-  { url: "https://www.technologyreview.com/feed/" },
-  { url: "https://www.chip.com.tr/rss/", region: "turkiye" },
-  { url: "https://rss.dw.com/rdf/rss-tur-all", region: "turkiye", section: "gundem" },
-  { url: "https://www.investing.com/rss/news.rss", section: "finans" },
-  { url: "https://www.marketwatch.com/rss/topstories", section: "finans" },
-  { url: "https://www.log.com.tr/feed/", region: "turkiye" },
-  { url: "https://www.teknoblog.com/feed/", region: "turkiye" },
-];
-const FEEDS = process.env.INGEST_FEEDS
-  ? process.env.INGEST_FEEDS.split(",").map((s) => ({ url: s.trim() })).filter((f) => f.url)
-  : FEED_LIST;
-
-const TOPICS = { "gundem": "Gündem", "finans": "Finans", "yapay-zeka": "Yapay Zeka", "yazilim": "Yazılım", "donanim": "Donanım", "bilim": "Bilim", "kripto": "Kripto", "siber": "Siber", "uzay": "Uzay" };
-const REGIONS = new Set(["estonya", "turkiye", "avrupa", "abd"]);
+// AI'nın sınıflandırabileceği bölümler (slug → kicker etiketi).
+// site.ts'teki borsa/hava/deprem BİLEREK yok: onlar canlı-veri panosu, haber
+// listesi değil. finans'ın sayfası yok ama Borsa'da "Piyasa Haberleri" olarak
+// gösterildiği için sınıflandırmada duruyor.
+const TOPICS = {
+  "gundem": "Gündem", "finans": "Finans", "yapay-zeka": "Yapay Zeka",
+  "yazilim": "Yazılım", "donanim": "Donanım", "girisim": "Girişim",
+  "bilim": "Bilim", "uzay": "Uzay", "kripto": "Kripto", "siber": "Siber",
+  "savunma": "Savunma", "otomobil": "Otomobil", "oyun": "Oyun", "spor": "Spor",
+  "kultur": "Kültür", "tasarim": "Tasarım", "yasam": "Yaşam",
+};
+const REGIONS = new Set(["estonya", "turkiye", "avrupa", "abd", "dunya"]);
 
 function log(...a) { console.log(new Date().toISOString(), ...a); }
 function slugify(s) {
@@ -173,6 +114,58 @@ async function rewrite(item) {
   return o;
 }
 
+// Bu koşuda çekilecek kaynakları seçer.
+// Öncelik: INGEST_FEEDS env (elle deneme) → DB rotasyonu → kürasyonlu çekirdek.
+async function selectFeeds(sb) {
+  if (process.env.INGEST_FEEDS) {
+    const list = process.env.INGEST_FEEDS.split(",").map((s) => ({ url: s.trim() })).filter((f) => f.url);
+    log(`kaynak: INGEST_FEEDS env (${list.length})`);
+    return list;
+  }
+  const { data, error } = await sb
+    .from("sources")
+    .select("id,url,name,section,region,country,fail_count")
+    .eq("active", true)
+    // FIFO rotasyon: hiç çekilmemişler (null) en önde.
+    .order("last_fetched_at", { ascending: true, nullsFirst: true })
+    .limit(FEEDS_PER_RUN);
+  if (error) { log("sources okunamadı, çekirdeğe düşülüyor:", error.message); return FEED_SEED; }
+  if (!data?.length) { log("sources boş, çekirdeğe düşülüyor (scripts/import-sources.mjs koştur)"); return FEED_SEED; }
+  log(`kaynak: DB rotasyonu (${data.length})`);
+  return data;
+}
+
+// Çekim sonuçlarını kaynaklara yazar: rotasyon saati, hata sayacı, ölü feed kapatma.
+// Kaynak DB'den gelmediyse (env/çekirdek fallback) id yok → atlanır.
+async function recordFeedStats(sb, feeds, stats) {
+  const now = new Date().toISOString();
+  const updates = [];
+  for (let i = 0; i < feeds.length; i++) {
+    const feed = feeds[i];
+    const st = stats[i];
+    if (!feed.id || !st) continue;
+    updates.push({
+      // url/name da gönderilir: ON CONFLICT DO UPDATE'te bile Postgres önce
+      // geçerli bir satır kurar, NOT NULL kolonlar eksikse insert'ten ÖNCE patlar.
+      id: feed.id, url: feed.url, name: feed.name,
+      last_fetched_at: now,
+      last_status: st.ok ? "ok" : st.error,
+      fail_count: st.ok ? 0 : (feed.fail_count || 0) + 1,
+      item_count: st.ok ? st.items : 0,
+    });
+  }
+  if (!updates.length) return;
+  const { error } = await sb.from("sources").upsert(updates, { onConflict: "id" });
+  if (error) { log("kaynak istatistiği yazılamadı:", error.message); return; }
+
+  // Üst üste çok hata veren kaynakları kapat.
+  const dead = updates.filter((u) => u.fail_count >= FAIL_LIMIT).map((u) => u.id);
+  if (dead.length) {
+    const { error: e2 } = await sb.from("sources").update({ active: false }).in("id", dead);
+    if (!e2) log(`ölü kaynak kapatıldı: ${dead.length}`);
+  }
+}
+
 async function main() {
   for (const [k, v] of Object.entries({ SUPABASE_URL, SERVICE_ROLE, OPENAI_API_KEY })) if (!v) { log("HATA eksik env", k); process.exit(1); }
   const sb = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
@@ -181,30 +174,69 @@ async function main() {
   const { data: existing } = await sb.from("dispatches").select("source_url,title").not("source_url", "is", null).limit(1000);
   const seen = new Set((existing || []).map((r) => r.source_url));
 
-  const perFeed = [];
-  for (const feed of FEEDS) {
-    try { const f = await parser.parseURL(feed.url); const arr = [];
-      for (const item of f.items || []) { if (item.link && !seen.has(item.link)) { arr.push({ item, feedTitle: f.title || feed.url, forcedRegion: feed.region || null, forcedSection: feed.section || null }); seen.add(item.link); } }
-      perFeed.push(arr);
-    } catch (e) { log("feed hatası", feed.url, e.message); }
+  const feeds = await selectFeeds(sb);
+
+  // Eşzamanlı çekim: havuz CONCURRENCY kadar feed'i paralel işler. perFeed
+  // sırası feeds sırasıyla AYNI kalmalı (round-robin adaleti buna dayanıyor),
+  // o yüzden sonuç kendi indeksine yazılır.
+  const perFeed = new Array(feeds.length).fill(null).map(() => []);
+  const stats = new Array(feeds.length);
+  let cursor = 0;
+  async function worker() {
+    for (;;) {
+      const i = cursor++;
+      if (i >= feeds.length) return;
+      const feed = feeds[i];
+      try {
+        const f = await parser.parseURL(feed.url);
+        for (const item of f.items || []) {
+          if (item.link && !seen.has(item.link)) {
+            perFeed[i].push({
+              item, feedTitle: f.title || feed.name || feed.url,
+              forcedRegion: feed.region || null, forcedSection: feed.section || null,
+              country: feed.country || null,
+            });
+            seen.add(item.link);
+          }
+        }
+        stats[i] = { ok: true, items: perFeed[i].length };
+      } catch (e) {
+        stats[i] = { ok: false, error: e.message.slice(0, 200) };
+        log("feed hatası", feed.url, e.message);
+      }
+    }
   }
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, feeds.length) }, worker));
+  const okCount = stats.filter((s) => s?.ok).length;
+  log(`feed: ${feeds.length} çekildi, ${okCount} başarılı, ${feeds.length - okCount} hatalı`);
+  // Rotasyon saatini hemen yaz: sonraki adımlar patlasa bile bu koşuda çekilen
+  // kaynaklar kuyruğun sonuna gitsin, yoksa aynı 60 kaynak sonsuza dek dönerdi.
+  await recordFeedStats(sb, feeds, stats);
+
   // round-robin: her feed'den sırayla (görselli feed'ler de paya girsin)
   const candidates = [];
   for (let i = 0; ; i++) { let any = false; for (const arr of perFeed) { if (arr[i]) { candidates.push(arr[i]); any = true; } } if (!any) break; }
   log(`aday: ${candidates.length}, tur limiti ${MAX_PER_RUN}`);
 
   let inserted = 0;
-  // Yüksek-hacimli forced section'lar (gündem/finans) tur başına sınırlanır ki
-  // niş kategoriler (uzay, kripto, siber, bilim, yazılım, girişim) slot bulsun.
-  const SECTION_CAPS = { gundem: Number(process.env.INGEST_GUNDEM_CAP || 5), finans: Number(process.env.INGEST_FINANS_CAP || 5) };
-  const secCount = { gundem: 0, finans: 0 };
+  // Tur başına bölüm kotası. Kaynak havuzu 1000+'e çıkınca gündem kaynakları
+  // (havuzun ~%37'si) her turu doldurabiliyor → HER bölüme genel bir tavan,
+  // yüksek hacimli iki bölüme daha sıkısı. Niş bölümler böylece slot bulur.
+  const DEFAULT_CAP = Number(process.env.INGEST_SECTION_CAP || 6);
+  const SECTION_CAPS = Object.fromEntries(Object.keys(TOPICS).map((s) => [s, DEFAULT_CAP]));
+  SECTION_CAPS.gundem = Number(process.env.INGEST_GUNDEM_CAP || 5);
+  SECTION_CAPS.finans = Number(process.env.INGEST_FINANS_CAP || 5);
+  const secCount = Object.fromEntries(Object.keys(TOPICS).map((s) => [s, 0]));
   const seenTitles = (existing || []).map((r) => normTitle(r.title)).filter((t) => t.length);
-  for (const { item, feedTitle, forcedRegion, forcedSection } of candidates.slice(0, MAX_PER_RUN)) {
+  for (const { item, feedTitle, forcedRegion, forcedSection, country } of candidates.slice(0, MAX_PER_RUN)) {
     try {
       if (forcedSection && SECTION_CAPS[forcedSection] != null && secCount[forcedSection] >= SECTION_CAPS[forcedSection]) { continue; }
       const o = await rewrite(item);
       if (forcedRegion) o.region = forcedRegion;
       if (forcedSection && TOPICS[forcedSection]) o.section = forcedSection;
+      // "dunya" bölgesi 28 ülkeyi topluyor; ülke bilgisi kaybolmasın diye
+      // etiket olarak eklenir (/ara?tag=india ile bulunabilir).
+      if (country) o.tags = [...new Set([...o.tags, slugify(country)])].slice(0, 5);
       const nt = normTitle(o.tr.title);
       if (seenTitles.some((t) => jaccard(t, nt) > 0.6)) { log("benzer haber atlandı:", o.tr.title.slice(0, 44)); continue; }
       if (SECTION_CAPS[o.section] != null && secCount[o.section] >= SECTION_CAPS[o.section]) { continue; }
