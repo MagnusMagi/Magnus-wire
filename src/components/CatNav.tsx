@@ -39,7 +39,7 @@ export function CatNav({ locale, active = "akis" }: { locale: Locale; active?: s
         <Link
           href={`/${locale}/${slug}`}
           aria-current={isActive ? "page" : undefined}
-          className={`block px-2 py-0.5 font-mono text-[11px] uppercase tracking-wide whitespace-nowrap border transition-colors ${
+          className={`block px-2 py-1 font-mono text-[11px] uppercase tracking-wide whitespace-nowrap border transition-colors ${
             isActive
               ? "border-signal text-signal font-bold"
               : "border-line text-ink-2 hover:border-ink hover:text-ink"

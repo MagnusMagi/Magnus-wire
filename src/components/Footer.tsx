@@ -6,7 +6,8 @@ import { PushButton } from "@/components/PushButton";
 import { SiteLogoutButton } from "@/components/SiteLogoutButton";
 
 export function Footer({ locale }: { locale: Locale }) {
-  const linkCls = "text-xs text-ink-2 uppercase tracking-wide hover:text-signal transition-colors";
+  // py-1: bağlantılar 16px yüksekliğindeydi, mobilde dokunma hedefi olarak küçüktü
+  const linkCls = "inline-block py-1 text-xs text-ink-2 uppercase tracking-wide hover:text-signal transition-colors";
   const colLabel = "font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-ink-3 mb-1";
   return (
     <footer className="border-t-2 border-ink bg-paper mt-auto">

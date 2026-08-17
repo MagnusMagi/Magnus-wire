@@ -18,7 +18,11 @@ export function LocaleSwitcher({ locale }: { locale: Locale }) {
           key={loc}
           href={swap(loc)}
           aria-current={loc === locale ? "true" : undefined}
-          className={loc === locale ? "text-signal font-bold" : "text-[#cdc9bd] hover:text-white"}
+          // 14x18px'lik dokunma hedefi mobilde isabet ettirilemiyordu (WCAG 2.2 asgari
+          // 24x24). Şerit yüksekliğini (32px) ve yatay dolguyu alıyor.
+          className={`inline-flex items-center justify-center h-8 min-w-[26px] ${
+            loc === locale ? "text-signal font-bold" : "text-[#cdc9bd] hover:text-white"
+          }`}
         >
           {LOCALE_NAME[loc]}
         </Link>
