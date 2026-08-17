@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { TOPICS, REGIONS } from "@/lib/site";
+import { TOPICS } from "@/lib/site";
 import { t, type Locale } from "@/lib/i18n";
 
 export function CatNav({ locale, active = "akis" }: { locale: Locale; active?: string }) {
@@ -22,8 +22,6 @@ export function CatNav({ locale, active = "akis" }: { locale: Locale; active?: s
       <ul className="mx-auto max-w-[1240px] flex items-center overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-6">
         {item("akis", t(locale, "feed"))}
         {TOPICS.map((s) => item(s.slug, s.label[locale]))}
-        <li aria-hidden className="flex-none px-2 text-line">|</li>
-        {REGIONS.map((s) => item(s.slug, s.label[locale]))}
         <li aria-hidden className="flex-none w-3" />
       </ul>
     </nav>
