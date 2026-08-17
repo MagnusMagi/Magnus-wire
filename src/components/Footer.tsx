@@ -3,6 +3,7 @@ import { FOOTER_LINKS } from "@/lib/site";
 import { t, type Locale } from "@/lib/i18n";
 import { NewsletterForm } from "@/components/NewsletterForm";
 import { PushButton } from "@/components/PushButton";
+import { SiteLogoutButton } from "@/components/SiteLogoutButton";
 
 export function Footer({ locale }: { locale: Locale }) {
   const linkCls = "text-xs text-ink-2 uppercase tracking-wide hover:text-signal transition-colors";
@@ -75,8 +76,11 @@ export function Footer({ locale }: { locale: Locale }) {
       <div className="border-t border-line">
         <div className="mx-auto max-w-[1240px] px-6 py-4 flex flex-wrap items-center justify-between gap-3">
           <span className="font-mono text-[11px] text-ink-3">{t(locale, "copy")}</span>
-          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-3 inline-flex items-center gap-1.5">
-            <span className="text-wire">●</span> {t(locale, "footerSourcesNote")}
+          <span className="inline-flex items-center gap-4">
+            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-3 inline-flex items-center gap-1.5">
+              <span className="text-wire">●</span> {t(locale, "footerSourcesNote")}
+            </span>
+            <SiteLogoutButton label={t(locale, "siteLogout")} />
           </span>
         </div>
       </div>
