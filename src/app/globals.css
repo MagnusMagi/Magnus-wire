@@ -85,13 +85,8 @@ html, body { overflow-x: clip; max-width: 100%; }
 img, svg, video { max-width: 100%; height: auto; }
 .wire-prose { overflow-wrap: break-word; }
 
-/* iOS: viewport-fit=cover + apple-mobile-web-app-status-bar-style=black-translucent
-   ile içerik durum çubuğunun ALTINA uzanır. Bu dolgu olmazsa topbar çentiğin
-   arkasında kalır. Tarayıcıda env(safe-area-inset-*) 0 döner, zararsızdır. */
-body {
-  padding-top: env(safe-area-inset-top);
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
-  padding-bottom: env(safe-area-inset-bottom);
-  background: var(--color-paper, #edebe4);
-}
+/* iOS güvenli alan dolgusu KALDIRILDI: viewport-fit=cover ile birlikte
+   eklenmişti, ama sticky/fixed öğeler body dolgusundan etkilenmediği için
+   sorunu çözmüyor, üstelik sayfayı aşağı itiyordu. statusBarStyle:"default"
+   ile iOS güvenli alanı kendisi ayırıyor. */
+

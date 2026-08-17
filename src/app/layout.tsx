@@ -15,7 +15,14 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: "WIRE",
-    statusBarStyle: "black-translucent",
+    // ⚠️ "black-translucent" DENENDİ ve GERİ ALINDI. viewport-fit=cover ile
+    // birlikte düzeni durum çubuğunun altına uzatıyor; body'ye güvenli alan
+    // dolgusu vermek YETMİYOR çünkü `sticky`/`fixed` öğeler body dolgusundan
+    // etkilenmez, viewport'a göre konumlanır → detay sayfasındaki sticky
+    // CatNav ve fixed ReadingProgress çentiğin altında kalıyordu, sayfa da
+    // yukarı kaydığı için "zoomlu" görünüyordu.
+    // "default" ile iOS durum çubuğu alanını ayırır, içerik altından başlar.
+    statusBarStyle: "default",
   },
   // Next `capable: true` için yalnız modern `mobile-web-app-capable` basıyor.
   // iOS'un tarihsel olarak beklediği `apple-mobile-web-app-capable` eski Safari
@@ -26,9 +33,9 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  // Çentikli iPhone'larda içerik güvenli alana yaslansın; black-translucent
-  // durum çubuğuyla birlikte bu olmazsa üst şerit çentiğin altında kalır.
-  viewportFit: "cover",
+  // ⚠️ viewportFit:"cover" KULLANILMIYOR — statusBarStyle:"default" ile
+  // iOS zaten güvenli alanı ayırıyor. "cover" düzeni çentiğin altına uzatır ve
+  // sticky/fixed öğeler oraya düşer (bkz appleWebApp notu).
   // Tarayıcı/uygulama krom rengi. Next 14'ten beri metadata'da DEĞİL,
   // viewport export'unda tanımlanıyor — eskiden hiç basılmıyordu.
   themeColor: "#1a1916",
