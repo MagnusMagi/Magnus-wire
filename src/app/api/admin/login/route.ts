@@ -27,7 +27,9 @@ export async function POST(req: Request) {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    path: "/admin",
+    // path "/" olmak zorunda: admin API'leri /api/admin/* altında ve path
+    // "/admin" olsaydı çerez o isteklere HİÇ gönderilmezdi (hep 401).
+    path: "/",
     maxAge: SESSION_MAX_AGE_SECONDS,
   });
 

@@ -9,7 +9,7 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
   if (!authed) redirect("/admin/login");
 
   return (
-    <div className="w-full max-w-2xl">
+    <div className="w-full max-w-5xl">
       <div className="flex items-center justify-between border-b-2 border-ink pb-3 mb-6">
         <span className="text-xs font-bold tracking-[0.08em] uppercase text-wire">
           MagiWire — Admin

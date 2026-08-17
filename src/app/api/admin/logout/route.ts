@@ -5,6 +5,7 @@ export const runtime = "nodejs";
 
 export async function POST() {
   const jar = await cookies();
-  jar.delete({ name: ADMIN_COOKIE, path: "/admin" });
+  // path, login'dekiyle birebir aynı olmalı — yoksa çerez silinmez.
+  jar.delete({ name: ADMIN_COOKIE, path: "/" });
   return Response.json({ ok: true });
 }
