@@ -31,6 +31,12 @@ const FAIL_LIMIT = Number(process.env.INGEST_FAIL_LIMIT || 3);
 // Bundan eski öğeler rewrite edilmeden elenir (bkz isFresh).
 const MAX_AGE_DAYS = Number(process.env.INGEST_MAX_AGE_DAYS || 7);
 
+// Koşu başına gerçek token tüketimi + maliyet. Fiyatlar 1M token başına USD;
+// env'den ezilebilir ki fiyat değişince kod değiştirmeden güncellensin.
+const PRICE_IN = Number(process.env.OPENAI_PRICE_IN || 0.15);
+const PRICE_OUT = Number(process.env.OPENAI_PRICE_OUT || 0.60);
+const tokenUse = { calls: 0, in: 0, out: 0 };
+
 // AI'nın sınıflandırabileceği bölümler (slug → kicker etiketi).
 // site.ts'teki borsa/hava/deprem BİLEREK yok: onlar canlı-veri panosu, haber
 // listesi değil. finans'ın sayfası yok ama Borsa'da "Piyasa Haberleri" olarak
@@ -115,7 +121,14 @@ async function rewrite(item) {
       messages: [{ role: "system", content: sys }, { role: "user", content: user }] }),
   });
   if (!res.ok) throw new Error(`OpenAI ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  const o = JSON.parse((await res.json()).choices[0].message.content);
+  const json = await res.json();
+  // Gerçek token tüketimi ölçülür — maliyet tahmin edilmesin. Elenen öğeler de
+  // (3 paragraf / keyFacts doğrulamasına takılanlar) sayaca dahil, çünkü çağrı
+  // yapıldığı an ücretlendiriliyor.
+  tokenUse.calls++;
+  tokenUse.in += json.usage?.prompt_tokens || 0;
+  tokenUse.out += json.usage?.completion_tokens || 0;
+  const o = JSON.parse(json.choices[0].message.content);
   // Sınıflandırılamayan öğe "gundem"e düşer. (Eskiden "yapay-zeka" idi; havuz
   // teknoloji dışına açılınca alakasız haberleri AI bölümüne dolduruyordu.)
   if (!TOPICS[o.section]) o.section = "gundem";
@@ -319,6 +332,10 @@ async function main() {
   // Az eklendiyse sebebi görünsün: eskiden kota atlamaları sessizdi ve koşunun
   // neden yarım kaldığı log'dan anlaşılmıyordu.
   log(`özet: eklenen ${inserted}/${MAX_PER_RUN}, rewrite ${attempts}/${MAX_ATTEMPTS}, atlanan → kota ${skips.kota}, benzer ${skips.benzer}, hata ${skips.hata}`);
+  const cost = (tokenUse.in / 1e6) * PRICE_IN + (tokenUse.out / 1e6) * PRICE_OUT;
+  // 48 koşu/gün (30 dk'lık cron) → günlük/aylık izdüşüm.
+  log(`maliyet: ${tokenUse.calls} çağrı, girdi ${tokenUse.in} + çıktı ${tokenUse.out} token, ` +
+      `bu koşu $${cost.toFixed(4)} → günlük ~$${(cost * 48).toFixed(2)}, aylık ~$${(cost * 48 * 30).toFixed(2)}`);
 
   const { data: newest } = await sb.from("dispatches").select("id").order("published_at", { ascending: false }).limit(1);
   if (newest?.[0]) { await sb.from("dispatches").update({ live: false }).neq("id", newest[0].id); await sb.from("dispatches").update({ live: true }).eq("id", newest[0].id); }

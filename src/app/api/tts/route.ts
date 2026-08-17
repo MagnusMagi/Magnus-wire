@@ -7,7 +7,14 @@ import { clientIp, rateLimited } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
-const CACHE = "/home/ubuntu/news-app/.audio-cache";
+// ⚠️ Reorg kalıntısı düzeltildi: burada "/home/ubuntu/news-app/.audio-cache"
+// yazılıydı — proje ~/apps/news-app'e taşındıktan sonra bile eski dizin var
+// olduğu için sessizce çalışmaya devam ediyordu. O dizin temizlenseydi her
+// dinleme yeniden OpenAI'ye gidip ücretlendirilirdi.
+// process.cwd() KULLANILAMAZ: standalone sunucu .next/standalone'dan koşuyor ve
+// orası her build'de siliniyor → önbellek her deploy'da sıfırlanırdı.
+// Bu yüzden yol env'den gelir (.env.local'de TTS_CACHE_DIR).
+const CACHE = process.env.TTS_CACHE_DIR || "/home/ubuntu/apps/news-app/.audio-cache";
 
 export async function GET(req: Request) {
   const sp = new URL(req.url).searchParams;
