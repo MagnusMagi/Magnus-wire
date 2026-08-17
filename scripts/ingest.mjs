@@ -246,9 +246,23 @@ async function main() {
   SECTION_CAPS.finans = Number(process.env.INGEST_FINANS_CAP || 5);
   const secCount = Object.fromEntries(Object.keys(TOPICS).map((s) => [s, 0]));
   const seenTitles = (existing || []).map((r) => normTitle(r.title)).filter((t) => t.length);
-  for (const { item, feedTitle, forcedRegion, forcedSection, country } of candidates.slice(0, MAX_PER_RUN)) {
+
+  // Aday listesi ESKİDEN slice(0,MAX_PER_RUN) ile önden kesiliyordu. Kota
+  // atlamaları (`continue`) o slotları boşa harcadığı için, rotasyon penceresi
+  // tek bir bölüme yüklendiğinde koşu yarım kalıyordu: kota 6'da dolar, kalan
+  // 18 slot çöpe gider, listedeki diğer adaylara hiç bakılmazdı.
+  // Artık TÜM adaylar taranır; durma koşulu iki tane:
+  //   inserted >= MAX_PER_RUN   → hedef eklemeye ulaşıldı
+  //   attempts >= MAX_ATTEMPTS  → OpenAI çağrısı tavanı (maliyet sınırı)
+  // Kota atlaması rewrite'tan ÖNCE olduğu için bedava, attempts'i artırmaz.
+  const MAX_ATTEMPTS = Number(process.env.INGEST_MAX_ATTEMPTS || MAX_PER_RUN);
+  let attempts = 0;
+  const skips = { kota: 0, benzer: 0, hata: 0 };
+  for (const { item, feedTitle, forcedRegion, forcedSection, country } of candidates) {
+    if (inserted >= MAX_PER_RUN || attempts >= MAX_ATTEMPTS) break;
     try {
-      if (forcedSection && SECTION_CAPS[forcedSection] != null && secCount[forcedSection] >= SECTION_CAPS[forcedSection]) { continue; }
+      if (forcedSection && SECTION_CAPS[forcedSection] != null && secCount[forcedSection] >= SECTION_CAPS[forcedSection]) { skips.kota++; continue; }
+      attempts++;
       const o = await rewrite(item);
       if (forcedRegion) o.region = forcedRegion;
       if (forcedSection && TOPICS[forcedSection]) o.section = forcedSection;
@@ -256,8 +270,8 @@ async function main() {
       // etiket olarak eklenir (/ara?tag=india ile bulunabilir).
       if (country) o.tags = [...new Set([...o.tags, slugify(country)])].slice(0, 5);
       const nt = normTitle(o.tr.title);
-      if (seenTitles.some((t) => jaccard(t, nt) > 0.6)) { log("benzer haber atlandı:", o.tr.title.slice(0, 44)); continue; }
-      if (SECTION_CAPS[o.section] != null && secCount[o.section] >= SECTION_CAPS[o.section]) { continue; }
+      if (seenTitles.some((t) => jaccard(t, nt) > 0.6)) { skips.benzer++; log("benzer haber atlandı:", o.tr.title.slice(0, 44)); continue; }
+      if (SECTION_CAPS[o.section] != null && secCount[o.section] >= SECTION_CAPS[o.section]) { skips.kota++; continue; }
       const hero = extractImage(item) || (await fetchOgImage(item.link));
       const slug = `${slugify(o.tr.title)}-${shortHash(item.link)}`;
       const row = {
@@ -271,8 +285,11 @@ async function main() {
       if (error) { log("insert hatası", slug, error.message); continue; }
       inserted++; seenTitles.push(nt); if (secCount[o.section] != null) secCount[o.section]++;
       log("eklendi:", o.section, o.region || "-", slug);
-    } catch (e) { log("öğe hatası", item.link, e.message); }
+    } catch (e) { skips.hata++; log("öğe hatası", item.link, e.message); }
   }
+  // Az eklendiyse sebebi görünsün: eskiden kota atlamaları sessizdi ve koşunun
+  // neden yarım kaldığı log'dan anlaşılmıyordu.
+  log(`özet: eklenen ${inserted}/${MAX_PER_RUN}, rewrite ${attempts}/${MAX_ATTEMPTS}, atlanan → kota ${skips.kota}, benzer ${skips.benzer}, hata ${skips.hata}`);
 
   const { data: newest } = await sb.from("dispatches").select("id").order("published_at", { ascending: false }).limit(1);
   if (newest?.[0]) { await sb.from("dispatches").update({ live: false }).neq("id", newest[0].id); await sb.from("dispatches").update({ live: true }).eq("id", newest[0].id); }
