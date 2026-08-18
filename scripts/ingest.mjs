@@ -107,35 +107,6 @@ function slugify(s) {
   const map = { ç: "c", ğ: "g", ı: "i", ö: "o", ş: "s", ü: "u", İ: "i" };
   return s.toLowerCase().replace(/[çğıöşüİ]/g, (c) => map[c] || c).replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
 }
-function extractImage(item) {
-  try {
-    if (item.enclosure?.url && /^https?:/.test(item.enclosure.url) && /(jpg|jpeg|png|webp|gif)/i.test(item.enclosure.type || item.enclosure.url)) return item.enclosure.url;
-    const m = item.media?.find?.((x) => x?.$?.url);
-    if (m?.$?.url) return m.$.url;
-    if (item.mediaThumb?.$?.url) return item.mediaThumb.$.url;
-    const html = item["content:encoded"] || item.content || "";
-    const mm = html.match(/<img[^>]+src=["\']([^"\']+)["\']/i);
-    if (mm && /^https?:/.test(mm[1])) return mm[1];
-  } catch {}
-  return null;
-}
-async function fetchOgImage(url) {
-  try {
-    const ctrl = new AbortController();
-    const to = setTimeout(() => ctrl.abort(), 8000);
-    const res = await fetch(url, { signal: ctrl.signal, redirect: "follow", headers: { "User-Agent": "Mozilla/5.0 (compatible; MagiWireBot/1.0; +https://news.magnusmagi.com)" } });
-    clearTimeout(to);
-    if (!res.ok) return null;
-    const html = (await res.text()).slice(0, 250000);
-    const pick = (re) => { const m = html.match(re); return m ? m[1] : null; };
-    let img = pick(/<meta[^>]+(?:property|name)=["\']og:image(?::url)?["\'][^>]+content=["\']([^"\']+)["\']/i)
-           || pick(/<meta[^>]+content=["\']([^"\']+)["\'][^>]+(?:property|name)=["\']og:image["\']/i)
-           || pick(/<meta[^>]+name=["\']twitter:image(?::src)?["\'][^>]+content=["\']([^"\']+)["\']/i);
-    if (img && img.startsWith("//")) img = "https:" + img;
-    else if (img && img.startsWith("/")) { try { img = new URL(url).origin + img; } catch {} }
-    return img && /^https?:\/\//.test(img) ? img.replace(/&amp;/g, "&") : null;
-  } catch { return null; }
-}
 const STOP = new Set(["ve","ile","bir","bu","için","the","and","for","with","ja","ning","kui","das","der","die"]);
 function normTitle(s) {
   const map = { "ç":"c","ğ":"g","ı":"i","ö":"o","ş":"s","ü":"u" };
@@ -538,11 +509,17 @@ async function main() {
       const nt = normTitle(o.tr.title);
       if (seenTitles.some((t) => jaccard(t, nt) > 0.6)) { skips.benzer++; log("benzer haber atlandı:", o.tr.title.slice(0, 44)); continue; }
       if (SECTION_CAPS[o.section] != null && secCount[o.section] >= SECTION_CAPS[o.section]) { skips.kota++; continue; }
-      const hero = extractImage(item) || (await fetchOgImage(item.link));
+      // ⚠️ Üçüncü taraf görseli ARTIK ALINMIYOR (2026-08-18). Kapaklar
+      // src/components/DispatchCover ile kendimiz üretiliyor. Gerekçe:
+      // 272 görselin 11'i URL'sinde adı geçen ajans işiydi (Getty), kalan
+      // 261'inin lisansı BİLİNMİYORDU — yayıncı CDN'inden gelmesi lisans
+      // göstermez. Görsel /api/img üzerinden kendi alan adımızdan kopya
+      // servis ediliyordu, yani "sadece gömüyoruz" savunması da yoktu.
+      // Yan fayda: haber başına bir og:image isteği eksildi.
       const slug = `${slugify(o.tr.title)}-${shortHash(item.link)}`;
       const row = {
         slug, kicker: TOPICS[o.section], section: o.section, region: o.region, conflict: o.conflict, tags: o.tags,
-        hero, live: false, author: "Tel Masası", source_url: item.link, source_name: feedTitle,
+        live: false, author: "Tel Masası", source_url: item.link, source_name: feedTitle,
         published_at: item.isoDate || new Date().toISOString(),
         title: o.tr.title, summary: o.tr.summary, body: o.tr.body,
         content: { tr: o.tr, en: o.en, et: o.et },

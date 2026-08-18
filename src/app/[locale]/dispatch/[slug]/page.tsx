@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CatNav } from "@/components/CatNav";
-import { ArticleImage } from "@/components/ArticleImage";
+import { DispatchCover } from "@/components/DispatchCover";
 import { mdxComponents } from "@/components/mdx";
 import { getDispatch, getDispatches } from "@/lib/dispatches";
 import { translateBody } from "@/lib/translate";
@@ -66,7 +66,7 @@ export default async function DispatchPage({ params }: { params: Promise<{ local
     "@type": "NewsArticle",
     headline: d.title,
     description: d.summary,
-    ...(d.hero ? { image: [d.hero] } : {}),
+    image: [`${SITE_URL}/api/cover/${d.slug}`],   // kendi ürettiğimiz kapak; üçüncü taraf foto YOK
     datePublished: d.publishedAt,
     dateModified: d.publishedAt,
     author: [{ "@type": "Organization", name: "MagiWire" }],
@@ -121,8 +121,7 @@ export default async function DispatchPage({ params }: { params: Promise<{ local
           </header>
 
           <figure className="max-w-[920px] mx-auto my-7">
-            <ArticleImage hero={d.hero} slug={d.slug} alt={d.title} ratio="aspect-[16/9]" />
-            <figcaption className="font-mono text-[11.5px] text-ink-3 mt-2 break-words">{t(locale, "photoBy")}{" "}{(() => { try { return d.hero ? new URL(d.hero).hostname.replace(/^www\./, "") : "MagiWire"; } catch { return "MagiWire"; } })()}</figcaption>
+            <DispatchCover slug={d.slug} section={d.section} locale={locale} ratio="aspect-[16/9]" />
           </figure>
 
           <div className="max-w-[680px] mx-auto mb-3"><AudioPlayer slug={d.slug} locale={locale} /></div>
@@ -180,7 +179,7 @@ export default async function DispatchPage({ params }: { params: Promise<{ local
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-7">
             {related.map((r) => (
               <article key={r.slug}>
-                <Link href={`/${locale}/dispatch/${r.slug}`} className="block mb-3"><ArticleImage hero={r.hero} slug={r.slug} alt={r.title} /></Link>
+                <Link href={`/${locale}/dispatch/${r.slug}`} className="block mb-3"><DispatchCover slug={r.slug} section={r.section} locale={locale} /></Link>
                 <span className="font-mono text-[11px] font-bold uppercase tracking-widest text-wire">{sectionLabel(r.section, locale)}</span>
                 <h3 className="font-serif text-[19px] leading-tight font-semibold tracking-tight mt-1.5">
                   <Link href={`/${locale}/dispatch/${r.slug}`} className="break-words hover:text-signal">{r.title}</Link>
