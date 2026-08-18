@@ -1,6 +1,5 @@
 // MagiWire — RSS → OpenAI (TR/EN/ET + bölge) → Supabase
 import Parser from "rss-parser";
-import { searchImage, pickQuery, isSensitive } from "./lib/images.mjs";
 import { FEED_SEED } from "./feeds.seed.mjs";
 import { createClient } from "@supabase/supabase-js";
 import { loadEnv } from "./env.mjs";
@@ -226,12 +225,6 @@ async function rewrite(item, source = {}) {
   }
   const bodyRule = "Markdown paragraflar. UZUNLUK HEDEFİ YOK. Her paragraf kaynaktan gelen EN AZ BİR somut bilgi taşımalı (sayı, tarih, isim, yer, fiyat, sürüm, oran, karşılaştırma). ⚠️ YASAK: kaynakta olmayan bilgi; tahmin ve genelleme; 'hedefliyor / amaçlıyor / inanıyor / bekleniyor / olacağı düşünülüyor' türü temenni cümleleri; aynı bilgiyi farklı kelimelerle TEKRAR etmek; 'önemli bir adım / dikkat çekici gelişme' gibi içi boş değerlendirmeler. Kaynak zayıfsa TEK paragraf yaz — kısa ve dolu, uzun ve boştan iyidir.";
   const factsRule = "kaynakta AÇIKÇA geçen 2-5 somut gerçek; her madde tek cümle ve mutlaka bir veri içersin (sayı, tarih, isim, yer, sürüm). Gövdedeki cümleyi kopyalama, maddeler birbirini tekrar etmesin. Kaynakta o kadar somut veri yoksa DAHA AZ madde yaz — uydurma.";
-  // ⚠️ Görsel sorgusu İNGİLİZCE ve JENERİK olmalı. Openverse İngilizce derlem;
-  // etiketlerimiz Türkçe olduğu için ("yatirim", "futbol") doğrudan kullanılamaz.
-  // Özel isim yasağı bilinçli: arşivden OLAYIN fotoğrafını değil, konuyu temsil
-  // eden bir sahne arıyoruz — kişi/şirket adıyla arama yapmak yanlış kişinin
-  // fotoğrafını haberin yanına koyma riskidir.
-  const imageQueryRule = "haberi TEMSİL EDEN jenerik bir sahne, İNGİLİZCE, 2-3 kelime. Örnek: 'wind turbine field', 'courtroom interior', 'shipping containers', 'hospital corridor'. ⚠️ Özel isim KULLANMA (kişi, şirket, marka, ülke, şehir adı YOK). Somut ve fotoğraflanabilir bir sahne olsun; soyut kavram ('innovation', 'future') YAZMA. Uygun jenerik sahne bulamazsan null.";
   const summaryRule = "tek cümle spot: NE oldu + KİM/NE + varsa sayı/tarih. Başlığı tekrar etme, soru sorma, 'işte detaylar' deme.";
   // Kaynağın ülkesi AI'ya BAĞLAM olarak verilir, cevap olarak değil.
   // Zorlama modelinde kaynağın ülkesi doğrudan bölge oluyordu ve Türk
@@ -241,7 +234,7 @@ async function rewrite(item, source = {}) {
   const originLine = source.country && source.country !== "Global"
     ? `Bu kaynak ${source.country} yayınıdır. Bu YALNIZCA bağlamdır — bölgeyi haberin KONUSUNA göre seç, kaynağın ülkesini otomatik kopyalama. Haber başka bir ülkeyi anlatıyorsa o ülkenin bölgesini yaz.`
     : `Bu kaynak küresel bir yayındır; bölgeyi haberin konusundan çıkar.`;
-  const user = `Kaynak: ${source.name || item.title}\n${originLine}\n\nKaynak başlık: ${item.title}\nKaynak metin: ${snippet}\n\nGövdeyi SADECE Türkçe yaz. "en" ve "et" için yalnızca başlık ve spot'un çevirisini ver — gövde YAZMA. SADECE şu JSON'u döndür:\n{\n "section": "şunlardan biri: ${Object.keys(TOPICS).join(", ")}",\n "region": "haberin KONUSU hangi coğrafyaysa şunlardan TAM BİRİ — DAHA SPESİFİK OLANI SEÇ: turkiye (Türkiye), estonya (Estonya), abd (ABD), avrupa (diğer Avrupa ülkeleri), asya (Japonya, Çin, Hindistan, Orta Doğu, Güneydoğu Asya...), amerika (ABD DIŞINDAKİ Amerika: Kanada, Meksika, Brezilya, Arjantin...), afrika (Afrika ülkeleri), okyanusya (Avustralya, Yeni Zelanda), dunya (belirli bir ülkeyle ilgili olmayan küresel haberler)",\n "conflict": "haber şu çatışmalardan BİRİNİN doğrudan parçasıysa onun anahtarı, DEĞİLSE null — ${Object.entries(CONFLICTS).map(([k, v]) => `${k}: ${v}`).join(" | ")}. ⚠️ Emin değilsen null yaz. Sadece 'savaş' ya da 'ordu' geçmesi yetmez; haber o çatışmanın kendisiyle ilgili OLMALI. Başka bir savaş (Gazze, Sudan, Yemen...) bu listede YOK, onlar için null.",\n "imageQuery": "${imageQueryRule}",\n "tags": ["2-4 küçük harf etiket"],\n "tr": {"title":"≤90 karakter", "summary":"${summaryRule}", "body":"${bodyRule}", "keyFacts":["ZORUNLU, en az 2 madde — ${factsRule}"]},\n "en": {"title":"tr.title'ın İngilizcesi", "summary":"tr.summary'nin İngilizcesi"},\n "et": {"title":"tr.title'ın Estoncası", "summary":"tr.summary'nin Estoncası"}\n}`;
+  const user = `Kaynak: ${source.name || item.title}\n${originLine}\n\nKaynak başlık: ${item.title}\nKaynak metin: ${snippet}\n\nGövdeyi SADECE Türkçe yaz. "en" ve "et" için yalnızca başlık ve spot'un çevirisini ver — gövde YAZMA. SADECE şu JSON'u döndür:\n{\n "section": "şunlardan biri: ${Object.keys(TOPICS).join(", ")}",\n "region": "haberin KONUSU hangi coğrafyaysa şunlardan TAM BİRİ — DAHA SPESİFİK OLANI SEÇ: turkiye (Türkiye), estonya (Estonya), abd (ABD), avrupa (diğer Avrupa ülkeleri), asya (Japonya, Çin, Hindistan, Orta Doğu, Güneydoğu Asya...), amerika (ABD DIŞINDAKİ Amerika: Kanada, Meksika, Brezilya, Arjantin...), afrika (Afrika ülkeleri), okyanusya (Avustralya, Yeni Zelanda), dunya (belirli bir ülkeyle ilgili olmayan küresel haberler)",\n "conflict": "haber şu çatışmalardan BİRİNİN doğrudan parçasıysa onun anahtarı, DEĞİLSE null — ${Object.entries(CONFLICTS).map(([k, v]) => `${k}: ${v}`).join(" | ")}. ⚠️ Emin değilsen null yaz. Sadece 'savaş' ya da 'ordu' geçmesi yetmez; haber o çatışmanın kendisiyle ilgili OLMALI. Başka bir savaş (Gazze, Sudan, Yemen...) bu listede YOK, onlar için null.",\n "tags": ["2-4 küçük harf etiket"],\n "tr": {"title":"≤90 karakter", "summary":"${summaryRule}", "body":"${bodyRule}", "keyFacts":["ZORUNLU, en az 2 madde — ${factsRule}"]},\n "en": {"title":"tr.title'ın İngilizcesi", "summary":"tr.summary'nin İngilizcesi"},\n "et": {"title":"tr.title'ın Estoncası", "summary":"tr.summary'nin Estoncası"}\n}`;
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_API_KEY}` },
@@ -263,13 +256,6 @@ async function rewrite(item, source = {}) {
   // Modelin uydurduğu ya da "yok"/"none" gibi serbest metin yazdığı değerleri
   // ele: yalnız tanımlı anahtarlar geçer, gerisi null (= çatışmasız).
   o.conflict = typeof o.conflict === "string" && CONFLICTS[o.conflict] ? o.conflict : null;
-  // Görsel sorgusu: en fazla 3 kelime, yalnız harf/boşluk. Model uzun cümle ya
-  // da özel isim yazarsa bölüm yedeğine düşeriz — kötü sorgu, sorgusuzdan kötü.
-  {
-    const q = typeof o.imageQuery === "string" ? o.imageQuery.trim().toLowerCase() : "";
-    const words = q.split(/\s+/).filter(Boolean);
-    o.imageQuery = /^[a-z\s]+$/.test(q) && words.length >= 2 && words.length <= 3 ? words.join(" ") : null;
-  }
   o.region = REGIONS.has(o.region) ? o.region : null;
   o.tags = Array.isArray(o.tags) ? o.tags.slice(0, 4).map((t) => slugify(String(t))) : [];
   // TR tam doğrulanır: gövde + keyFacts kalite eşiği burada.
@@ -525,30 +511,14 @@ async function main() {
       if (SECTION_CAPS[o.section] != null && secCount[o.section] >= SECTION_CAPS[o.section]) { skips.kota++; continue; }
       const slug = `${slugify(o.tr.title)}-${shortHash(item.link)}`;
 
-      // ⚠️ Yayıncının kendi görseli ARTIK ALINMIYOR. 272 görselin 11'i
-      // URL'sinde adı geçen ajans işiydi (Getty), kalan 261'inin lisansı
-      // BİLİNMİYORDU — yayıncı CDN'inden gelmesi lisans göstermez.
-      // Yerine YALNIZ CC0/BY/BY-SA lisanslı Openverse sonuçları kullanılıyor:
-      // bu lisanslar çoğaltma ve türeve açıkça izin veriyor, atıf ise
-      // hero_credit'te saklanıp sayfada gösteriliyor.
-      //
-      // ⚠️ Sorgu haberin KENDİSİNDEN değil BÖLÜMDEN kurulur (jenerik sahne).
-      // Haber metninden sorgu üretmek isabet getirmiyor: MagnusPhotography'de
-      // ölçüldü, "Balıkçı köyü" başlığına "nükleer karşıtı kampanyacılar"
-      // gelmişti. Görsel zaten "Temsili" etiketiyle sunuluyor.
-      //
-      // ⚠️ Hassas haberde (şiddet/suç/afet) foto HİÇ kullanılmaz: jenerik bir
-      // stok fotoğraf orada yanıltıcı, bazen incitici olur — okuyucu onu
-      // olayın fotoğrafı sanabilir. O haberler üretilmiş kapağa düşer.
-      let hero = null, heroCredit = null;
-      if (!isSensitive(`${o.tr.title} ${o.tr.summary} ${(o.tags || []).join(" ")}`)) {
-        const found = await searchImage(o.imageQuery || pickQuery(o.section, slug), { seed: slug })
-          || (o.imageQuery ? await searchImage(pickQuery(o.section, slug), { seed: slug }) : null);
-        if (found) { hero = found.url; heroCredit = found.credit; }
-      }
+      // Kapaklar üretiliyor (src/components/DispatchCover): üçüncü taraf
+      // fotoğrafı hiç kullanılmıyor. Kısa bir süre lisansı temiz CC
+      // fotoğrafları denendi ama jenerik stok kareler haberle yeterince
+      // ilgili durmuyordu; tipografik kapak hem daha dürüst hem daha
+      // tutarlı bir görsel kimlik veriyor. `hero`/`hero_credit` kolonları
+      // duruyor ama artık ne yazılıyor ne okunuyor.
       const row = {
         slug, kicker: TOPICS[o.section], section: o.section, region: o.region, conflict: o.conflict, tags: o.tags,
-        hero, hero_credit: heroCredit,
         live: false, author: "Tel Masası", source_url: item.link, source_name: feedTitle,
         published_at: item.isoDate || new Date().toISOString(),
         title: o.tr.title, summary: o.tr.summary, body: o.tr.body,

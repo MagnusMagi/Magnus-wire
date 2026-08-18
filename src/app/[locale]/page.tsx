@@ -2,7 +2,7 @@ import Link from "next/link";
 import { CatNav } from "@/components/CatNav";
 import { Dispatch } from "@/components/Dispatch";
 import { SignalPanel, MostReadPanel, FollowPanel } from "@/components/Rail";
-import { DispatchPhoto } from "@/components/DispatchPhoto";
+import { DispatchCover } from "@/components/DispatchCover";
 import { SourceLink } from "@/components/SourceLink";
 import { getDispatches, agoLabel, latestTs } from "@/lib/dispatches";
 import { sectionLabel } from "@/lib/site";
@@ -56,7 +56,11 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
                     <div><SourceLink url={lead.sourceUrl} name={lead.sourceName} locale={locale} compact /></div>
                   </div>
                   <Link href={`/${locale}/dispatch/${lead.slug}`} aria-hidden tabIndex={-1}>
-                    <DispatchPhoto hero={lead.hero} heroCredit={lead.heroCredit} slug={lead.slug} section={lead.section} locale={locale} title={lead.title} />
+                    {/* ⚠️ Manşette kapağa başlık GEÇİLMEZ: başlık zaten hemen solunda
+                      devasa puntoyla duruyor, kapakta tekrarı yan yana iki kez
+                      aynı metin demek. Kart ve ilgili haberlerde başlık geçer,
+                      çünkü orada kapak metnin YERİNE bakılan şey. */}
+                  <DispatchCover slug={lead.slug} section={lead.section} locale={locale} />
                   </Link>
                 </div>
               </article>

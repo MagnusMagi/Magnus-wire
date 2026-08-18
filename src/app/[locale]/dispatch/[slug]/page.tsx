@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CatNav } from "@/components/CatNav";
-import { DispatchPhoto } from "@/components/DispatchPhoto";
+import { DispatchCover } from "@/components/DispatchCover";
 import { mdxComponents } from "@/components/mdx";
 import { getDispatch, getDispatches } from "@/lib/dispatches";
 import { translateBody } from "@/lib/translate";
@@ -121,7 +121,7 @@ export default async function DispatchPage({ params }: { params: Promise<{ local
           </header>
 
           <figure className="max-w-[920px] mx-auto my-7">
-            <DispatchPhoto hero={d.hero} heroCredit={d.heroCredit} slug={d.slug} section={d.section} locale={locale} title={d.title} ratio="aspect-[16/9]" />
+            <DispatchCover slug={d.slug} section={d.section} locale={locale} title={d.title} ratio="aspect-[16/9]" />
           </figure>
 
           <div className="max-w-[680px] mx-auto mb-3"><AudioPlayer slug={d.slug} locale={locale} /></div>
@@ -179,7 +179,7 @@ export default async function DispatchPage({ params }: { params: Promise<{ local
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-7">
             {related.map((r) => (
               <article key={r.slug}>
-                <Link href={`/${locale}/dispatch/${r.slug}`} className="block mb-3"><DispatchPhoto hero={r.hero} heroCredit={r.heroCredit} slug={r.slug} section={r.section} locale={locale} title={r.title} /></Link>
+                <Link href={`/${locale}/dispatch/${r.slug}`} className="block mb-3"><DispatchCover slug={r.slug} section={r.section} locale={locale} title={r.title} /></Link>
                 <span className="font-mono text-[11px] font-bold uppercase tracking-widest text-wire">{sectionLabel(r.section, locale)}</span>
                 <h3 className="font-serif text-[19px] leading-tight font-semibold tracking-tight mt-1.5">
                   <Link href={`/${locale}/dispatch/${r.slug}`} className="break-words hover:text-signal">{r.title}</Link>
