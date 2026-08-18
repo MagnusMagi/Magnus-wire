@@ -17,9 +17,9 @@ export async function SignalPanel({ locale }: { locale: Locale }) {
       <PanelHead><span className="w-2 h-2 rounded-full bg-signal wire-pulse" /> {t(locale, "signal")}</PanelHead>
       <ul className="m-0 p-0 list-none">
         {latest.map((d) => (
-          <li key={d.slug} className="grid grid-cols-[52px_1fr] gap-3 py-[11px] border-b border-dotted border-line text-[13px] text-ink-2">
+          <li key={d.slug} className="grid grid-cols-[52px_minmax(0,1fr)] gap-3 py-[11px] border-b border-dotted border-line text-[13px] text-ink-2">
             <time className="text-wire font-bold text-xs">{d.time.slice(0, 5)}</time>
-            <Link href={`/${locale}/dispatch/${d.slug}`} className="hover:text-signal">{d.summary}</Link>
+            <Link href={`/${locale}/dispatch/${d.slug}`} className="min-w-0 break-words hover:text-signal">{d.summary}</Link>
           </li>
         ))}
       </ul>
@@ -27,6 +27,11 @@ export async function SignalPanel({ locale }: { locale: Locale }) {
   );
 }
 
+// ⚠️ `minmax(0,1fr)` + `break-words` ŞART. Tailwind'in keyfi `1fr`'i
+// min-content'in altına inemez; başlıkta kırılamayan tek bir uzun token
+// ("Microsoft.FeatureManagement.AspNetCore" gibi paket adları haberlerde sık)
+// sütunu şişirip paneli viewport dışına taşırıyordu. Ölçüldü 2026-08-18:
+// 320px ekranda bağlantı 327px genişliğe çıkıp r=450'ye taşıyordu.
 export async function MostReadPanel({ locale }: { locale: Locale }) {
   const top = await getMostRead(locale, 5);
   return (
@@ -34,9 +39,9 @@ export async function MostReadPanel({ locale }: { locale: Locale }) {
       <PanelHead><span className="text-signal">★</span> {t(locale, "mostRead")}</PanelHead>
       <ol className="m-0 p-0 list-none [counter-reset:r]">
         {top.map((d) => (
-          <li key={d.slug} className="grid grid-cols-[26px_1fr] gap-[13px] py-3 border-b border-dotted border-line last:border-0 text-[13.5px] leading-snug [counter-increment:r]">
+          <li key={d.slug} className="grid grid-cols-[26px_minmax(0,1fr)] gap-[13px] py-3 border-b border-dotted border-line last:border-0 text-[13.5px] leading-snug [counter-increment:r]">
             <span className="font-mono text-xs font-bold text-wire pt-0.5 before:content-[counter(r,decimal-leading-zero)]" />
-            <Link href={`/${locale}/dispatch/${d.slug}`} className="hover:text-signal">{d.title}</Link>
+            <Link href={`/${locale}/dispatch/${d.slug}`} className="min-w-0 break-words hover:text-signal">{d.title}</Link>
           </li>
         ))}
       </ol>

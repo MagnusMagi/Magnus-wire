@@ -1,4 +1,9 @@
 import { test, expect } from "@playwright/test";
+import { passGate } from "./gate";
+
+// Tüm site parola kapısının arkasında; kapıyı geçmeyen test giriş sayfasını
+// ölçer ve yanıltıcı sonuç verir (bkz e2e/gate.ts).
+test.beforeEach(async ({ context, baseURL }) => { await passGate(context, baseURL); });
 
 test.describe("Hava (weather) page", () => {
   test("hava page loads with the weather board and city search", async ({ page }) => {

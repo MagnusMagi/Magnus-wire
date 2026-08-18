@@ -183,7 +183,7 @@ export default async function DispatchPage({ params }: { params: Promise<{ local
                 <Link href={`/${locale}/dispatch/${r.slug}`} className="block mb-3"><ArticleImage hero={r.hero} slug={r.slug} alt={r.title} /></Link>
                 <span className="font-mono text-[11px] font-bold uppercase tracking-widest text-wire">{sectionLabel(r.section, locale)}</span>
                 <h3 className="font-serif text-[19px] leading-tight font-semibold tracking-tight mt-1.5">
-                  <Link href={`/${locale}/dispatch/${r.slug}`} className="hover:text-signal">{r.title}</Link>
+                  <Link href={`/${locale}/dispatch/${r.slug}`} className="break-words hover:text-signal">{r.title}</Link>
                 </h3>
                 <SourceLink url={r.sourceUrl} name={r.sourceName} locale={locale} compact />
               </article>

@@ -18,7 +18,7 @@ export function MoversStrip({ quotes, locale }: { quotes: Quote[]; locale: Local
   const losers = sorted.filter((q) => q.changePct < 0).slice(-4).reverse();
   if (!gainers.length && !losers.length) return null;
   return (
-    <div className="mb-7 grid sm:grid-cols-2 gap-2.5">
+    <div className="mb-7 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
       <div className="border border-line bg-panel/40 px-3.5 py-2.5">
         <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-wire">{t(locale, "topGainers")}</span>
         <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5 font-mono text-[12px] tabular-nums">

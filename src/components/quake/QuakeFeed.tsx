@@ -155,7 +155,14 @@ function QuakeHero({ q, locale, onOpen }: { q: Quake; locale: Locale; onOpen: ()
   const map = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${q.lat},${q.lon}`;
   return (
     <div className="mb-9 border-2 border-ink bg-panel/40">
-      <div className="grid lg:grid-cols-[1fr_1fr]">
+      {/* ⚠️ `grid-cols-1` ŞART: yalnız `lg:grid-cols-*` yazılırsa mobilde grid
+          hiç sütun tanımı almaz, örtük tek sütun `auto` (≈max-content) olur ve
+          uzun yer adı + harita iframe'i sütunu kabın iki katına şişirir.
+          Ölçüldü 2026-08-18: 375px ekranda kap 327px iken sütun 647px.
+          html/body'deki `overflow-x: clip` taşmayı GİZLEDİĞİ için ne gözle ne
+          de scrollWidth ölçen E2E testiyle görünüyordu — içerik sessizce
+          kırpılıyordu. `grid-cols-1` = minmax(0,1fr), yani çocuklar küçülebilir. */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr]">
         <div className="p-5 sm:p-6 flex flex-col gap-3">
           <span className="font-mono text-[11px] font-bold uppercase tracking-widest text-signal inline-flex items-center gap-1.5">
             <span className="w-[6px] h-[6px] rounded-full bg-signal wire-pulse" />{t(locale, "quakeStrongest")}

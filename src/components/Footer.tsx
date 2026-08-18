@@ -13,7 +13,7 @@ export function Footer({ locale }: { locale: Locale }) {
     <footer className="border-t-2 border-ink bg-paper mt-auto">
       {/* Günlük tel — bülten bandı */}
       <div className="border-b border-line bg-panel/30">
-        <div className="mx-auto max-w-[1240px] px-6 py-12 grid gap-10 lg:grid-cols-[1.1fr_1fr] lg:gap-16 items-start">
+        <div className="mx-auto max-w-[1240px] px-6 py-12 grid grid-cols-1 gap-10 lg:grid-cols-[1.1fr_1fr] lg:gap-16 items-start">
           <div>
             <span className="inline-flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-wire">
               <span className="w-[6px] h-[6px] rounded-full bg-wire wire-pulse" /> {t(locale, "newsletterKicker")}
@@ -49,7 +49,7 @@ export function Footer({ locale }: { locale: Locale }) {
       </div>
 
       {/* Bağlantı sütunları */}
-      <div className="mx-auto max-w-[1240px] px-6 py-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr]">
+      <div className="mx-auto max-w-[1240px] px-6 py-10 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr]">
         <div>
           <Link href={`/${locale}`} aria-label="MagiWire" className="font-serif text-[22px] font-black tracking-tight inline-flex items-baseline gap-2">
             Magi <span className="font-mono text-[11px] font-bold tracking-[0.22em] text-paper bg-ink px-2 py-0.5">WIRE</span>

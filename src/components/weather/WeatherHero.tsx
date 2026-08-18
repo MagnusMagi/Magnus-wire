@@ -53,7 +53,7 @@ export function WeatherHero({ defaultCity, locale }: { defaultCity: CityWeather;
 
   return (
     <div className="mb-9 border-2 border-ink bg-panel/40">
-      <div className="grid lg:grid-cols-[1.05fr_1fr]">
+      <div className="grid grid-cols-1 lg:grid-cols-[1.05fr_1fr]">
         {/* Sol: büyük durum */}
         <div className="p-5 sm:p-6 flex flex-col gap-3">
           <span className="font-mono text-[11px] font-bold uppercase tracking-widest text-wire inline-flex items-center gap-1.5">

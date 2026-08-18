@@ -34,7 +34,7 @@ export default async function StoriesPage({ params }: { params: Promise<{ locale
         {stories.length === 0 ? (
           <p className="font-mono text-ink-2 py-10">{t(locale, "storiesEmpty")}</p>
         ) : (
-          <div className="grid gap-x-10 gap-y-12 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-x-10 gap-y-12 md:grid-cols-2">
             {stories.map((s) => (
               <section key={s.key} className="min-w-0">
                 <div className="flex items-center gap-2 mb-3">

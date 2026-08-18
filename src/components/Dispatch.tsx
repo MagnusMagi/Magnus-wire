@@ -17,7 +17,13 @@ export function Dispatch({ d, ago, index, locale }: { d: D; ago: string; index: 
         <span className={`font-mono text-[11px] font-bold tracking-widest uppercase ${d.live ? "text-signal" : "text-wire"}`}>
           {sectionLabel(d.section, locale)}{d.region ? ` · ${sectionLabel(d.region, locale)}` : ""}
         </span>
-        <h2 className="font-serif text-[23px] leading-tight font-semibold tracking-tight my-[6px]">
+        {/* ⚠️ `break-words` ŞART: sütun minmax(0,1fr) ile küçülebiliyor ama
+            kırılamayan tek bir uzun token (paket adı, uzun URL — teknoloji
+            haberlerinde sık) yine de kutuyu aşıyor. Ölçüldü 2026-08-18:
+            "Microsoft.FeatureManagement.AspNetCore" 320px ekranda başlığı
+            327px'e çıkarıp viewport dışına taşırıyordu; html'deki
+            `overflow-x: clip` bunu gizlediği için gözle de fark edilmiyordu. */}
+        <h2 className="font-serif text-[23px] leading-tight font-semibold tracking-tight my-[6px] break-words">
           <Link href={`/${locale}/dispatch/${d.slug}`} className="hover:text-signal">{d.title}</Link>
         </h2>
         <p className="text-ink-2 text-[13.5px] m-0 max-w-[60ch]">{d.summary}</p>
