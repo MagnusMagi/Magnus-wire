@@ -160,6 +160,67 @@ function isFresh(item) {
 }
 function shortHash(s) { let h = 0; for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0; return Math.abs(h).toString(36).slice(0, 6); }
 
+// ⚠️ Model uzun süre yalnız RSS teaser'ını görüyordu: çoğu feed gövdenin ilk
+// paragrafını (bazen tek cümle) veriyor. "Bilgi yoğun yaz" demenin bir anlamı
+// yok, ortada aktarılacak bilgi yoksa — kalite tavanını girdi belirliyor.
+// Bu yüzden teaser kısaysa makalenin kendisi çekilip modele veriliyor.
+//
+// Bilerek YENİ BAĞIMLILIK EKLENMEDİ (jsdom + readability bu iş için ağır).
+// Sezgisel çıkarım: gürültü etiketlerini at, <article>/articleBody varsa onu
+// al, yoksa <p> bloklarını topla. Mükemmel değil; başarısızsa teaser'a düşer.
+const ARTICLE_MIN_SNIPPET = Number(process.env.INGEST_ARTICLE_MIN_SNIPPET || 900);
+const ARTICLE_MAX_CHARS = Number(process.env.INGEST_ARTICLE_MAX_CHARS || 7000);
+const ARTICLE_TIMEOUT_MS = Number(process.env.INGEST_ARTICLE_TIMEOUT_MS || 9000);
+// Koşu başına tavan: makale çekimi ağ süresi demek ve ingest 30 dakikalık
+// cron aralığında bitmeli. MAX_PER_RUN kadar haber yazılıyor, birkaç deneme
+// payı bırakılıyor.
+const ARTICLE_FETCH_BUDGET = Number(process.env.INGEST_ARTICLE_BUDGET || 10);
+let articleFetches = 0;
+const articleStats = { tried: 0, ok: 0, failed: 0, gained: 0 };
+
+function htmlToText(html) {
+  let h = html
+    .replace(/<(script|style|noscript|svg|iframe|form|template)[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<(nav|header|footer|aside)[\s\S]*?<\/\1>/gi, " ");
+  // Önce asıl gövde kabını dene; yoksa tüm <p>'leri topla.
+  const box = h.match(/<article[^>]*>([\s\S]*?)<\/article>/i)
+    || h.match(/<[^>]+itemprop=["']articleBody["'][^>]*>([\s\S]*?)<\/[a-z]+>/i);
+  if (box) h = box[1];
+  const paras = [...h.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)]
+    .map((m) => m[1].replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim())
+    .filter((t) => t.length > 60);           // menü/telif satırlarını ele
+  const text = paras.join("\n\n");
+  return text
+    .replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .slice(0, ARTICLE_MAX_CHARS);
+}
+
+async function fetchArticleText(url) {
+  if (!url || articleFetches >= ARTICLE_FETCH_BUDGET) return "";
+  articleFetches++; articleStats.tried++;
+  for (const ua of [UA_BOT, UA_BROWSER]) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), ARTICLE_TIMEOUT_MS);
+      try {
+        const res = await fetch(url, { signal: ctrl.signal, redirect: "follow",
+          headers: { "User-Agent": ua, Accept: "text/html,application/xhtml+xml" } });
+        if (!res.ok) throw new Error(`Status code ${res.status}`);
+        const ct = res.headers.get("content-type") || "";
+        if (!/html/i.test(ct)) throw new Error("html değil");
+        const text = htmlToText(await res.text());
+        if (text.length > 200) { articleStats.ok++; return text; }
+        throw new Error("metin çıkarılamadı");
+      } finally { clearTimeout(timer); }
+    } catch (e) {
+      if (!/\b403\b/.test(e.message || "")) break;   // 403 dışında UA'nın ilgisi yok
+    }
+  }
+  articleStats.failed++;
+  return "";
+}
+
 async function rewrite(item, source = {}) {
   // Gövde YALNIZ Türkçe üretilir. EN/ET için sadece başlık + spot istenir:
   // liste/kategori/arama sayfaları ve sitemap üç dilde anlamlı kalsın diye.
@@ -170,10 +231,30 @@ async function rewrite(item, source = {}) {
   // ⚠️ keyFacts vurgusu sys prompt'ta AÇIKÇA duruyor: gövdeyi tek dile indiren
   // ilk sürümde model dikkatini "sadece başlık/spot çevir" kısmına verip
   // tr.keyFacts'i boş bırakmaya başlamıştı → öğelerin çoğu doğrulamada eleniyordu.
-  const sys = "Sen çok dilli bir haber editörüsün (teknoloji + güncel/gündem). Verilen kaynaktan özgün, kısa, doğru bir haber üret. Gövdeyi yalnız TÜRKÇE yaz; İngilizce ve Estonca için sadece başlık ve spot çevir. tr.keyFacts alanı ZORUNLUDUR ve en az 3 madde içermelidir — boş bırakma. Abartma, tıklama tuzağı kurma.";
-  const snippet = (item.contentSnippet || item["content:encoded"] || item.content || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 2500);
-  const bodyRule = "EN AZ 3 dolu paragraf (her paragraf 3-5 cümle, toplam ≥250 kelime). Markdown; gerekirse bir ## ara başlık. Bağlam, arka plan ve olası etkileri açıkla — yüzeysel özet GEÇME.";
-  const factsRule = "haberin 3-5 kilit gerçeği / öne çıkan noktası; her madde tek kısa cümle, somut (sayı/isim/tarih varsa kullan)";
+  // ⚠️ Uzunluk hedefi BİLEREK kaldırıldı. Eski kural "≥250 kelime, en az 3
+  // paragraf" idi ve doğrulama 3 paragraftan azını ÇÖPE ATIYORDU; model de
+  // ister istemez dolduruyordu. Ölçüm 2026-08-18: gerçek ortalama 146 kelime
+  // (yani hedef zaten tutmuyordu) ve 290 telin 287'si tam 3 paragraf — "en az
+  // 3" tavana dönüşmüştü. Çıktı tipik olarak aynı iddianın üç kez yeniden
+  // ifadesiydi ("güvenli" → "güvenliği ön planda" → "riskleri minimize") artı
+  // kaynakta olmayan temenni cümleleri ("hedefliyor", "inanıyor") — yani
+  // uzunluk kuralı hem dolgu hem halisinasyon üretiyordu.
+  const sys = "Sen çok dilli bir haber editörüsün (teknoloji + güncel/gündem). Verilen kaynaktan doğru ve BİLGİ YOĞUN bir haber üret. Uzunluk hedefin YOK: kaynakta ne varsa onu aktar, bittiği yerde bitir. Doldurmak için cümle uydurmak, aynı bilgiyi yeniden ifade etmek ve kaynakta olmayanı yazmak en ağır hatadır. Gövdeyi yalnız TÜRKÇE yaz; İngilizce ve Estonca için sadece başlık ve spot çevir. Abartma, tıklama tuzağı kurma.";
+  const feedText = (item.contentSnippet || item["content:encoded"] || item.content || "")
+    .replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  // Teaser yeterince doluysa ağa çıkma: bedava bilgi varken istek atmak
+  // hem yavaşlatır hem kaynağı gereksiz yorar.
+  let snippet = feedText.slice(0, 2500);
+  if (feedText.length < ARTICLE_MIN_SNIPPET && item.link) {
+    const full = await fetchArticleText(item.link);
+    if (full.length > feedText.length) {
+      articleStats.gained += full.length - feedText.length;
+      snippet = full.slice(0, ARTICLE_MAX_CHARS);
+    }
+  }
+  const bodyRule = "Markdown paragraflar. UZUNLUK HEDEFİ YOK. Her paragraf kaynaktan gelen EN AZ BİR somut bilgi taşımalı (sayı, tarih, isim, yer, fiyat, sürüm, oran, karşılaştırma). ⚠️ YASAK: kaynakta olmayan bilgi; tahmin ve genelleme; 'hedefliyor / amaçlıyor / inanıyor / bekleniyor / olacağı düşünülüyor' türü temenni cümleleri; aynı bilgiyi farklı kelimelerle TEKRAR etmek; 'önemli bir adım / dikkat çekici gelişme' gibi içi boş değerlendirmeler. Kaynak zayıfsa TEK paragraf yaz — kısa ve dolu, uzun ve boştan iyidir.";
+  const factsRule = "kaynakta AÇIKÇA geçen 2-5 somut gerçek; her madde tek cümle ve mutlaka bir veri içersin (sayı, tarih, isim, yer, sürüm). Gövdedeki cümleyi kopyalama, maddeler birbirini tekrar etmesin. Kaynakta o kadar somut veri yoksa DAHA AZ madde yaz — uydurma.";
+  const summaryRule = "tek cümle spot: NE oldu + KİM/NE + varsa sayı/tarih. Başlığı tekrar etme, soru sorma, 'işte detaylar' deme.";
   // Kaynağın ülkesi AI'ya BAĞLAM olarak verilir, cevap olarak değil.
   // Zorlama modelinde kaynağın ülkesi doğrudan bölge oluyordu ve Türk
   // gazetesinin "Belçika'da orman yangını" haberi `turkiye` etiketi alıyordu.
@@ -182,7 +263,7 @@ async function rewrite(item, source = {}) {
   const originLine = source.country && source.country !== "Global"
     ? `Bu kaynak ${source.country} yayınıdır. Bu YALNIZCA bağlamdır — bölgeyi haberin KONUSUNA göre seç, kaynağın ülkesini otomatik kopyalama. Haber başka bir ülkeyi anlatıyorsa o ülkenin bölgesini yaz.`
     : `Bu kaynak küresel bir yayındır; bölgeyi haberin konusundan çıkar.`;
-  const user = `Kaynak: ${source.name || item.title}\n${originLine}\n\nKaynak başlık: ${item.title}\nKaynak metin: ${snippet}\n\nGövdeyi SADECE Türkçe yaz. "en" ve "et" için yalnızca başlık ve spot'un çevirisini ver — gövde YAZMA. SADECE şu JSON'u döndür:\n{\n "section": "şunlardan biri: ${Object.keys(TOPICS).join(", ")}",\n "region": "haberin KONUSU hangi coğrafyaysa şunlardan TAM BİRİ — DAHA SPESİFİK OLANI SEÇ: turkiye (Türkiye), estonya (Estonya), abd (ABD), avrupa (diğer Avrupa ülkeleri), asya (Japonya, Çin, Hindistan, Orta Doğu, Güneydoğu Asya...), amerika (ABD DIŞINDAKİ Amerika: Kanada, Meksika, Brezilya, Arjantin...), afrika (Afrika ülkeleri), okyanusya (Avustralya, Yeni Zelanda), dunya (belirli bir ülkeyle ilgili olmayan küresel haberler)",\n "conflict": "haber şu çatışmalardan BİRİNİN doğrudan parçasıysa onun anahtarı, DEĞİLSE null — ${Object.entries(CONFLICTS).map(([k, v]) => `${k}: ${v}`).join(" | ")}. ⚠️ Emin değilsen null yaz. Sadece 'savaş' ya da 'ordu' geçmesi yetmez; haber o çatışmanın kendisiyle ilgili OLMALI. Başka bir savaş (Gazze, Sudan, Yemen...) bu listede YOK, onlar için null.",\n "tags": ["2-4 küçük harf etiket"],\n "tr": {"title":"≤90 karakter", "summary":"tek cümle spot", "body":"${bodyRule}", "keyFacts":["ZORUNLU, 3-5 madde — ${factsRule}"]},\n "en": {"title":"tr.title'ın İngilizcesi", "summary":"tr.summary'nin İngilizcesi"},\n "et": {"title":"tr.title'ın Estoncası", "summary":"tr.summary'nin Estoncası"}\n}`;
+  const user = `Kaynak: ${source.name || item.title}\n${originLine}\n\nKaynak başlık: ${item.title}\nKaynak metin: ${snippet}\n\nGövdeyi SADECE Türkçe yaz. "en" ve "et" için yalnızca başlık ve spot'un çevirisini ver — gövde YAZMA. SADECE şu JSON'u döndür:\n{\n "section": "şunlardan biri: ${Object.keys(TOPICS).join(", ")}",\n "region": "haberin KONUSU hangi coğrafyaysa şunlardan TAM BİRİ — DAHA SPESİFİK OLANI SEÇ: turkiye (Türkiye), estonya (Estonya), abd (ABD), avrupa (diğer Avrupa ülkeleri), asya (Japonya, Çin, Hindistan, Orta Doğu, Güneydoğu Asya...), amerika (ABD DIŞINDAKİ Amerika: Kanada, Meksika, Brezilya, Arjantin...), afrika (Afrika ülkeleri), okyanusya (Avustralya, Yeni Zelanda), dunya (belirli bir ülkeyle ilgili olmayan küresel haberler)",\n "conflict": "haber şu çatışmalardan BİRİNİN doğrudan parçasıysa onun anahtarı, DEĞİLSE null — ${Object.entries(CONFLICTS).map(([k, v]) => `${k}: ${v}`).join(" | ")}. ⚠️ Emin değilsen null yaz. Sadece 'savaş' ya da 'ordu' geçmesi yetmez; haber o çatışmanın kendisiyle ilgili OLMALI. Başka bir savaş (Gazze, Sudan, Yemen...) bu listede YOK, onlar için null.",\n "tags": ["2-4 küçük harf etiket"],\n "tr": {"title":"≤90 karakter", "summary":"${summaryRule}", "body":"${bodyRule}", "keyFacts":["ZORUNLU, en az 2 madde — ${factsRule}"]},\n "en": {"title":"tr.title'ın İngilizcesi", "summary":"tr.summary'nin İngilizcesi"},\n "et": {"title":"tr.title'ın Estoncası", "summary":"tr.summary'nin Estoncası"}\n}`;
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_API_KEY}` },
@@ -209,10 +290,15 @@ async function rewrite(item, source = {}) {
   // TR tam doğrulanır: gövde + keyFacts kalite eşiği burada.
   const tr = o.tr;
   if (!tr?.title || !tr?.body) throw new Error("eksik tr içerik");
+  // ⚠️ Paragraf SAYISI artık eşik değil. Eski kural (3 paragraftan azını at)
+  // modeli doldurmaya zorluyordu: kaynak tek cümlelikken bile üç paragraf
+  // üretmek zorundaydı, farkı uydurarak kapatıyordu. Eşik artık hacim değil
+  // ASGARİ İÇERİK: boş/kırpık çıktıyı eler, kısa ama dolu gövdeyi geçirir.
   const paras = String(tr.body).split(/\n\s*\n/).filter((p) => p.trim().length > 40);
-  if (paras.length < 3) throw new Error(`tr gövdesi 3 paragraftan kısa (${paras.length})`);
+  const bodyWords = String(tr.body).trim().split(/\s+/).filter(Boolean).length;
+  if (!paras.length || bodyWords < 45) throw new Error(`tr gövdesi çok kısa (${bodyWords} kelime, ${paras.length} paragraf)`);
   tr.keyFacts = Array.isArray(tr.keyFacts) ? tr.keyFacts.map((f) => String(f).trim()).filter(Boolean).slice(0, 5) : [];
-  if (tr.keyFacts.length < 3) throw new Error(`tr keyFacts<3 (${tr.keyFacts.length})`);
+  if (tr.keyFacts.length < 2) throw new Error(`tr keyFacts<2 (${tr.keyFacts.length})`);
   // EN/ET'den yalnız başlık + spot beklenir. Model yine de gövde döndürürse
   // atılır — gövdenin tek kaynağı TR, çevirisi talep üzerine üretilir.
   for (const l of ["en", "et"]) {
@@ -512,6 +598,9 @@ async function main() {
 
   if (process.env.REVALIDATE_SECRET) {
     try { const r = await fetch("http://127.0.0.1:3360/api/revalidate", { method: "POST", headers: { "x-revalidate-secret": process.env.REVALIDATE_SECRET } }); log("revalidate:", r.status); } catch (e) { log("revalidate hatası", e.message); }
+  }
+  if (articleStats.tried) {
+    log(`makale çekimi: ${articleStats.ok}/${articleStats.tried} başarılı, ${articleStats.failed} başarısız, +${Math.round(articleStats.gained / 1000)}k karakter bağlam`);
   }
   log(`bitti. eklenen: ${inserted}`);
 }
