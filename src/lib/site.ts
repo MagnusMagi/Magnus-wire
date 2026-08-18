@@ -110,6 +110,12 @@ export function sectionHref(locale: Locale, slug: string): string {
   return `/${locale}/${SECTION_PAGE_ALIAS[slug] ?? slug}`;
 }
 
+// Bağış bağlantısı. Tek yerde durur: footer, künye ve hakkımızda sayfaları
+// aynı sabiti kullanır, böylece adres değişince üç yer birden güncellenir.
+// ⚠️ Bu bağlantı eklendiğinde künye'deki "ticari değildir" ifadesi de
+// güncellendi (üç dilde): site kendi beyanıyla çelişemez.
+export const SUPPORT_URL = "https://buymeacoffee.com/magnusmagi";
+
 // Kurumsal alt menü (slug + i18n anahtarı)
 export const FOOTER_LINKS: { slug: string; key: string }[] = [
   { slug: "hakkimizda", key: "about" },

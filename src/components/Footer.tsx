@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FOOTER_LINKS } from "@/lib/site";
+import { FOOTER_LINKS, SUPPORT_URL } from "@/lib/site";
 import { t, type Locale } from "@/lib/i18n";
 import { NewsletterForm } from "@/components/NewsletterForm";
 import { PushButton } from "@/components/PushButton";
@@ -49,7 +49,7 @@ export function Footer({ locale }: { locale: Locale }) {
       </div>
 
       {/* Bağlantı sütunları */}
-      <div className="mx-auto max-w-[1240px] px-6 py-10 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr]">
+      <div className="mx-auto max-w-[1240px] px-6 py-10 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr]">
         <div>
           <Link href={`/${locale}`} aria-label="MagiWire" className="font-serif text-[22px] font-black tracking-tight inline-flex items-baseline gap-2">
             Magi <span className="font-mono text-[11px] font-bold tracking-[0.22em] text-paper bg-ink px-2 py-0.5">WIRE</span>
@@ -70,7 +70,20 @@ export function Footer({ locale }: { locale: Locale }) {
           <Link href={`/${locale}/etiketler`} className={linkCls}>{t(locale, "tagsLabel")}</Link>
           <Link href={`/${locale}/akis`} className={linkCls}>{t(locale, "myFeed")}</Link>
           <Link href={`/${locale}/hikayeler`} className={linkCls}>{t(locale, "storiesTitle")}</Link>
+          <Link href={`/${locale}/savas`} className={linkCls}>{t(locale, "warTitle")}</Link>
         </nav>
+
+        {/* Destek. Haber akışının ve makale gövdesinin DIŞINDA tutuluyor:
+            okuma akışını bölmediği gibi, bağışın içerik karşılığı değil
+            altyapı gideri için olduğu çerçevesini de korur. */}
+        <div>
+          <span className={colLabel}>{t(locale, "supportLabel")}</span>
+          <p className="font-mono text-[12px] text-ink-2 leading-relaxed mt-1 mb-3 max-w-[260px]">{t(locale, "supportBlurb")}</p>
+          <a href={SUPPORT_URL} target="_blank" rel="noopener noreferrer external"
+            className="inline-flex items-center font-mono text-[11px] font-bold uppercase tracking-wide px-3 py-2 border border-ink hover:bg-ink hover:text-paper transition-colors">
+            {t(locale, "supportCta")}
+          </a>
+        </div>
       </div>
 
       {/* Alt bar */}

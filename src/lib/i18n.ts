@@ -31,6 +31,7 @@ const STRINGS: Record<Locale, Dict> = {
     emptySection: "Bu bölümde henüz dispatch yok.",
     about: "Hakkımızda", contact: "İletişim", imprint: "Künye", privacy: "Gizlilik", cookies: "Çerezler",
     warTitle: "Savaş", warKicker: "Çatışma masası", warSub: "Takip edilen çatışmaların telleri tek yerde; her cephe kendi sayfasında toplanır.", warEmpty: "Bu çatışmaya dair henüz tel yok.", warAllFronts: "Cepheler", warLatest: "Son gelişmeler", warOpen: "Cepheyi aç →", warBack: "← Savaş", warCount: "tel",
+    supportLabel: "Destek", supportCta: "☕ Bir kahve ısmarla", supportBlurb: "MagiWire'ı bağışlar ayakta tutuyor — sunucu ve API giderleri için.", supportThanks: "Destekleyen herkese teşekkürler.",
     copy: "© 2026 MagiWire — prototip", agoNow: "az önce", agoMin: "dk önce", agoHour: "sa önce", follow: "Takip Et", followBlurb: "Otomatik, kişisel bir teknoloji akışı. RSS ile takip et.", rssBtn: "RSS akışı →", about2: "Proje hakkında →", source: "Kaynak", viaSource: "kaynak", siteLogout: "Çıkış yap", regionsLabel: "Bölge", panelsLabel: "Pano",
   },
   en: {
@@ -53,6 +54,7 @@ const STRINGS: Record<Locale, Dict> = {
     emptySection: "No dispatches in this section yet.",
     about: "About", contact: "Contact", imprint: "Masthead", privacy: "Privacy", cookies: "Cookies",
     warTitle: "War", warKicker: "Conflict desk", warSub: "Wires from the conflicts we track, gathered per front.", warEmpty: "No wires on this conflict yet.", warAllFronts: "Fronts", warLatest: "Latest", warOpen: "Open front →", warBack: "← War", warCount: "wires",
+    supportLabel: "Support", supportCta: "☕ Buy me a coffee", supportBlurb: "MagiWire runs on donations — they cover server and API costs.", supportThanks: "Thanks to everyone chipping in.",
     copy: "© 2026 MagiWire — prototype", agoNow: "just now", agoMin: "min ago", agoHour: "h ago", follow: "Follow", followBlurb: "An automated, personal tech feed. Follow via RSS.", rssBtn: "RSS feed →", about2: "About the project →", source: "Source", viaSource: "via", siteLogout: "Log out", regionsLabel: "Regions", panelsLabel: "Panels",
   },
   et: {
@@ -75,6 +77,7 @@ const STRINGS: Record<Locale, Dict> = {
     emptySection: "Selles sektsioonis pole veel uudiseid.",
     about: "Meist", contact: "Kontakt", imprint: "Impressum", privacy: "Privaatsus", cookies: "Küpsised",
     warTitle: "Sõda", warKicker: "Konfliktilaud", warSub: "Jälgitavate konfliktide uudised koos, iga rinne omal lehel.", warEmpty: "Selle konflikti kohta pole veel uudiseid.", warAllFronts: "Rinded", warLatest: "Viimased", warOpen: "Ava rinne →", warBack: "← Sõda", warCount: "uudist",
+    supportLabel: "Toeta", supportCta: "☕ Osta mulle kohvi", supportBlurb: "MagiWire püsib annetustel — need katavad serveri ja API kulud.", supportThanks: "Aitäh kõigile toetajatele.",
     copy: "© 2026 MagiWire — prototüüp", agoNow: "äsja", agoMin: "min tagasi", agoHour: "t tagasi", follow: "Jälgi", followBlurb: "Automaatne isiklik tehnoloogiavoog. Jälgi RSS kaudu.", rssBtn: "RSS-voog →", about2: "Projektist →", source: "Allikas", viaSource: "allikas", siteLogout: "Logi välja", regionsLabel: "Piirkond", panelsLabel: "Paneelid",
   },
 };
