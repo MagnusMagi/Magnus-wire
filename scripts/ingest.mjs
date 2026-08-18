@@ -38,6 +38,17 @@ const CONCURRENCY = Number(process.env.INGEST_CONCURRENCY || 12);
 // denenir (1421 kaynak / 60 = ~24 koşu ≈ yarım gün), yani her hata ayrı bir güne
 // denk gelir. 10 olsaydı ölü bir feed ~5 gün havuzda slot işgal ederdi.
 const FAIL_LIMIT = Number(process.env.INGEST_FAIL_LIMIT || 3);
+// ⚠️ GEÇİCİ hata KALICI kapatmaya yol açmamalı. Ölçüm 2026-08-18: kapatılmış
+// 178 kaynağın 84'ü (%47) ölü değildi — 403 engelleme 64, 429 hız sınırı 9,
+// timeout 9, 5xx 2. Üçü de zamanla düzelen durumlar, üstelik 429 doğrudan
+// BİZİM çok hızlı vurduğumuzun işareti; cezayı kaynağın çekmesi tersine bir
+// tepki. Geri açan hiçbir mekanizma olmadığı için havuz tek yönlü eriyordu.
+// Bu yüzden geçici hatalar ayrı ve çok daha yüksek bir eşikle kapatılır:
+// sonsuza dek denenmezler (rotasyon slotu israfı olurdu) ama üç vuruşta da
+// emekli edilmezler. Kalıcı hatalar (404/410/DNS/ayrıştırma) eskisi gibi.
+const TRANSIENT_FAIL_LIMIT = Number(process.env.INGEST_TRANSIENT_FAIL_LIMIT || 12);
+const TRANSIENT_RE = /\b(403|408|425|429|500|502|503|504)\b|timed out|timeout|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|socket hang up|network|aborted/i;
+const isTransient = (status) => !!status && TRANSIENT_RE.test(String(status));
 // Bundan eski öğeler rewrite edilmeden elenir (bkz isFresh).
 const MAX_AGE_DAYS = Number(process.env.INGEST_MAX_AGE_DAYS || 7);
 
@@ -222,6 +233,43 @@ async function selectFeeds(sb) {
 
 // Çekim sonuçlarını kaynaklara yazar: rotasyon saati, hata sayacı, ölü feed kapatma.
 // Kaynak DB'den gelmediyse (env/çekirdek fallback) id yok → atlanır.
+// Feed çekimi rss-parser'ın parseURL'i yerine BURADAN geçer: UA yedeği için
+// isteği kendimiz kurmamız gerekiyor.
+//
+// Dürüst bot kimliği VARSAYILAN kalır; yalnız 403 alındığında bir kez yaygın
+// bir tarayıcı kimliğiyle tekrar denenir. Ölçüldü 2026-08-18: 403 veren 12
+// beslemenin 2'si (~%17) tarayıcı kimliğiyle 200 dönüyor, gerisi Cloudflare /
+// veri merkezi IP engeli — yani bu bir "403'leri yok eden" numara değil,
+// ~11 kaynaklık mütevazı bir kurtarma. Sıralama bilinçli: kimliğimizi
+// saklamayı varsayılan yapmıyoruz, yalnız reddedilince başvuruyoruz.
+const UA_BOT = "Mozilla/5.0 (compatible; MagiWireBot/1.0; +https://news.magnusmagi.com)";
+const UA_BROWSER = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
+const FEED_TIMEOUT_MS = Number(process.env.INGEST_FEED_TIMEOUT_MS || 15000);
+
+async function fetchFeed(parser, url) {
+  let last;
+  for (const ua of [UA_BOT, UA_BROWSER]) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), FEED_TIMEOUT_MS);
+      try {
+        const res = await fetch(url, {
+          signal: ctrl.signal, redirect: "follow",
+          headers: { "User-Agent": ua, Accept: "application/rss+xml, application/atom+xml, application/xml;q=0.9, */*;q=0.8" },
+        });
+        // Hata metni "Status code NNN" biçiminde tutulur: sources.last_status'ta
+        // zaten bu biçim yazılı ve isTransient() ona göre eşleşiyor.
+        if (!res.ok) throw new Error(`Status code ${res.status}`);
+        return await parser.parseString(await res.text());
+      } finally { clearTimeout(timer); }
+    } catch (e) {
+      last = e;
+      if (!/\b403\b/.test(e.message || "")) throw e;  // 403 dışında UA'nın ilgisi yok
+    }
+  }
+  throw last;
+}
+
 async function recordFeedStats(sb, feeds, stats) {
   const now = new Date().toISOString();
   const updates = [];
@@ -243,18 +291,25 @@ async function recordFeedStats(sb, feeds, stats) {
   const { error } = await sb.from("sources").upsert(updates, { onConflict: "id" });
   if (error) { log("kaynak istatistiği yazılamadı:", error.message); return; }
 
-  // Üst üste çok hata veren kaynakları kapat.
-  const dead = updates.filter((u) => u.fail_count >= FAIL_LIMIT).map((u) => u.id);
+  // Üst üste çok hata veren kaynakları kapat — eşik hatanın TÜRÜNE bağlı
+  // (bkz TRANSIENT_FAIL_LIMIT). Karar son hataya göre verilir: bir kaynak
+  // 404 vermeye başladıysa geçmişteki timeout'ları onu kurtarmamalı.
+  const dead = updates
+    .filter((u) => u.fail_count >= (isTransient(u.last_status) ? TRANSIENT_FAIL_LIMIT : FAIL_LIMIT))
+    .map((u) => u.id);
   if (dead.length) {
     const { error: e2 } = await sb.from("sources").update({ active: false }).in("id", dead);
     if (!e2) log(`ölü kaynak kapatıldı: ${dead.length}`);
   }
+  const nursing = updates.filter((u) => !u.last_status?.startsWith("ok") && isTransient(u.last_status) && u.fail_count >= FAIL_LIMIT).length;
+  if (nursing) log(`geçici hatayla ayakta tutulan kaynak: ${nursing} (kalıcı eşik ${TRANSIENT_FAIL_LIMIT})`);
 }
 
 async function main() {
   for (const [k, v] of Object.entries({ SUPABASE_URL, SERVICE_ROLE, OPENAI_API_KEY })) if (!v) { log("HATA eksik env", k); process.exit(1); }
   const sb = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
-  const parser = new Parser({ timeout: 15000, headers: { "User-Agent": "Mozilla/5.0 (compatible; MagiWireBot/1.0; +https://news.magnusmagi.com)" }, customFields: { item: [["media:content","media",{keepArray:true}],["media:thumbnail","mediaThumb"],"content:encoded"] } });
+  // timeout/headers artık fetchFeed'in işi; parser yalnız parseString için.
+  const parser = new Parser({ customFields: { item: [["media:content","media",{keepArray:true}],["media:thumbnail","mediaThumb"],"content:encoded"] } });
 
   const { data: existing } = await sb.from("dispatches").select("source_url,title").not("source_url", "is", null).limit(1000);
   const seen = new Set((existing || []).map((r) => r.source_url));
@@ -273,7 +328,7 @@ async function main() {
       if (i >= feeds.length) return;
       const feed = feeds[i];
       try {
-        const f = await parser.parseURL(feed.url);
+        const f = await fetchFeed(parser, feed.url);
         for (const item of f.items || []) {
           if (item.link && !seen.has(item.link) && isFresh(item)) {
             perFeed[i].push({
