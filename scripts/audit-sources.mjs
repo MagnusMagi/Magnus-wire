@@ -4,13 +4,17 @@
 //   node scripts/audit-sources.mjs            → rapor (hiçbir şey yazmaz)
 //   node scripts/audit-sources.mjs --apply    → önerileri uygular
 //   node scripts/audit-sources.mjs --limit 50 → yalnız ilk N kaynak
+//   --force → toplu bölüm silme emniyetini aş (bkz WIPE_LIMIT)
+//   --json <dosya> → bulguları JSON yaz (seçerek uygulamak için)
+//   --from <dosya> → JSON'daki bulguları uygula (LLM'e hiç gitmez)
 //
 // Neden gerekiyor: ülkeler TLD tahminiyle dolduruldu (.com.tr güvenilir ama
 // tüm .com'lara "Global" dendi) ve bölüm ataması kaynaklar.md'nin 51 kategorisi
 // üzerinden TOPLU yapıldı — kaynak bazında hiç doğrulanmadı.
 //
 // Maliyeti düşük tutmak için kaynaklar TOPLU gönderilir (BATCH tanesi bir
-// çağrıda): 774 kaynak ~39 çağrı ≈ $0.02. Tek tek sorulsaydı 774 çağrı olurdu.
+// çağrıda): 774 kaynak ~39 çağrı ≈ $0.12. Tek tek sorulsaydı 774 çağrı olurdu.
+import { readFileSync, writeFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import { loadEnv, requireEnv } from "./env.mjs";
 
@@ -18,8 +22,38 @@ loadEnv();
 const [SUPABASE_URL, SERVICE_ROLE, OPENAI_API_KEY] = requireEnv(
   "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "OPENAI_API_KEY",
 );
-const MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+// ⚠️ gpt-4o-mini bu iş için YETERSİZ, ölçüldü (2026-08-18, aynı prompt, 774 kaynak):
+//   gpt-4o-mini → 161 öneri, bunların 35'i bölüm SİLME ve hepsi uydurma.
+//                 Gerekçeleri kendi önerisiyle çelişiyordu ("Genel haber
+//                 kaynağı" deyip Al Jazeera'nın `gundem` bölümünü silmek,
+//                 Guardian'ın Meksika beslemesini Mexico→Global yapmak).
+//   gpt-5-mini   → 72 öneri, bölüm silme SIFIR; DW Türkçe/Euronews Türkçe'yi
+//                 doğru şekilde Türkiye'ye çekti, yukarıdaki tuzakların
+//                 hiçbirine düşmedi.
+// Fark $0.016 → $0.117; denetim seyrek koştuğu için önemsiz.
+// ⚠️ BİLEREK `OPENAI_MODEL` OKUNMUYOR. O değişken ingest.mjs'e ait ve
+// .env.local'de gpt-4o-mini'ye sabitli (haber yeniden yazımı her koşuda
+// çalışır, aylık ~$4 bütçe ona bağlı). Denetim seyrek koşar ve doğruluk
+// ister → kendi değişkeni var. Bir kez bu tuzağa düşüldü: kod varsayılanı
+// gpt-5-mini yapıldı ama .env.local sessizce ezip denetimi yine 4o-mini ile
+// koşturdu, "düzeltildi" sanılan koşu eski hataları üretti.
+const MODEL = process.env.AUDIT_MODEL || "gpt-5-mini";
+const SUPPORTS_TEMPERATURE = !/^(gpt-5|o[1-9])/.test(MODEL);
+// $/1M token (girdi, çıktı). Bilinmeyen model 4o-mini fiyatıyla raporlanır —
+// maliyet satırı bilgi amaçlı, faturalandırma değil.
+const PRICES = {
+  "gpt-4o-mini": [0.15, 0.6], "gpt-4o": [2.5, 10],
+  "gpt-4.1": [2, 8], "gpt-4.1-mini": [0.4, 1.6], "gpt-4.1-nano": [0.1, 0.4],
+  "gpt-5": [1.25, 10], "gpt-5-mini": [0.25, 2],
+};
 const APPLY = process.argv.includes("--apply");
+const FORCE = process.argv.includes("--force");
+// Bir koşuda kaç bölüm silmesine izin verilir (üstünde --force şart).
+const WIPE_LIMIT = Number(process.env.AUDIT_WIPE_LIMIT || 5);
+// Bulguları makine-okunur dosyaya yaz: insan gözden geçirip SEÇEREK
+// uygulayabilsin. Rapor metni kısaltma yapıyor (uzun URL, query string) —
+// karar dosyası olarak KULLANILAMAZ.
+const JSON_OUT = process.argv.includes("--json") ? process.argv[process.argv.indexOf("--json") + 1] : null;
 const LIMIT = Number(process.argv[process.argv.indexOf("--limit") + 1]) || 0;
 const BATCH = Number(process.env.AUDIT_BATCH || 20);
 const CONCURRENCY = Number(process.env.AUDIT_CONCURRENCY || 6);
@@ -40,8 +74,29 @@ let COUNTRY_VOCAB = ["Global"];
 
 const usage = { calls: 0, in: 0, out: 0 };
 
-function hostOf(url) {
-  try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return url; }
+// ⚠️ Raporda HOST DEĞİL, host+yol yazılır. Host'a indirgeyen eski sürüm
+// theguardian.com/world/mexico/rss ile theguardian.com/world/rss'i ayırt
+// edilemez kılıyordu → doğru satırlar raporda saçma görünüyordu.
+function labelOf(url) {
+  try {
+    const u = new URL(url);
+    const label = u.hostname.replace(/^www\./, "") + u.pathname.replace(/\/$/, "");
+    return label.length > 52 ? label.slice(0, 51) + "…" : label;
+  } catch { return url.slice(0, 52); }
+}
+
+// Bölümü kaldırma niyetinin AÇIK sentinel'i. Bkz auditBatch'teki null notu.
+const WIPE = "YOK";
+
+// Alan hem {yeni,neden} nesnesi hem de düz değer olarak gelebilir (model
+// sözleşmeye her zaman uymuyor). Düz değerde satır geneli `neden`e düşülür.
+function fieldOf(v, fallbackNeden) {
+  const neden = (x) => String(x || "").slice(0, 120);
+  if (v === undefined) return { yeni: undefined, neden: "" };
+  if (v !== null && typeof v === "object") {
+    return { yeni: v.yeni === undefined ? undefined : v.yeni, neden: neden(v.neden || fallbackNeden) };
+  }
+  return { yeni: v, neden: neden(fallbackNeden) };
 }
 
 async function auditBatch(rows) {
@@ -79,14 +134,24 @@ Kaynaklar:
 ${list}
 
 SADECE YANLIŞ olanları döndür. Doğru olanları listeleme. JSON:
-{"duzeltmeler":[{"i":1,"ulke":"...","bolum":"...","neden":"kısa gerekçe"}]}
-Değiştirilmeyecek alanı atla. Bölüm null olacaksa "bolum":null yaz.`;
+{"duzeltmeler":[{"i":1,"ulke":{"yeni":"United States","neden":"o alana özgü kısa gerekçe"},"bolum":{"yeni":"finans","neden":"o alana özgü kısa gerekçe"}}]}
+
+⚠️ ÇIKTI KURALLARI — bunlara uymazsan öneri ATILIR:
+1. Değişiklik önermediğin alanı HİÇ YAZMA. Alanı mevcut değeriyle tekrar yazmak öneri DEĞİLDİR.
+2. Her alanın gerekçesi KENDİ içinde olur ve YALNIZ o alanı anlatır. Bölümle ilgili gerekçeyi ülke alanına yazma.
+3. Bölümü KALDIRMAK istiyorsan "bolum":{"yeni":"YOK","neden":"..."} yaz. null YAZMA.
+4. Bir kuralı tekrar etmek ("gundem'e null önerilmez") öneri değildir — o durumda o kaynak için HİÇBİR ŞEY döndürme.
+5. Hiç hata yoksa {"duzeltmeler":[]} döndür.`;
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_API_KEY}` },
     body: JSON.stringify({
-      model: MODEL, response_format: { type: "json_object" }, temperature: 0,
+      model: MODEL, response_format: { type: "json_object" },
+      // ⚠️ gpt-5 / o-serisi `temperature`i reddediyor (400: "Only the default
+      // (1) value is supported"). Eski sürüm bu modellerde HER partiyi
+      // hataya düşürüp "0 öneri" diye sessizce bitiyordu.
+      ...(SUPPORTS_TEMPERATURE ? { temperature: 0 } : {}),
       messages: [{ role: "system", content: sys }, { role: "user", content: user }],
     }),
   });
@@ -101,37 +166,73 @@ Değiştirilmeyecek alanı atla. Bölüm null olacaksa "bolum":null yaz.`;
   for (const d of parsed.duzeltmeler ?? []) {
     const row = rows[Number(d.i) - 1];
     if (!row) continue;
-    // Modelin uydurduğu bölüm adlarını ele.
-    const bolum = d.bolum === null || d.bolum === undefined ? undefined
-      : SECTIONS.includes(d.bolum) ? d.bolum : undefined;
-    const ulkeRaw = typeof d.ulke === "string" ? d.ulke.trim() : "";
-    const ulke = COUNTRY_VOCAB.includes(ulkeRaw) ? ulkeRaw : undefined;
+
     const change = {};
-    if (ulke && ulke !== row.country) change.country = ulke;
-    if (d.bolum === null && row.section !== null) change.section = null;
-    else if (bolum && bolum !== row.section) change.section = bolum;
-    if (Object.keys(change).length) {
-      out.push({ row, change, neden: String(d.neden || "").slice(0, 120) });
+    const reasons = {};
+
+    // ⚠️ Ülke: sözlükte olmayan değer atılır; mevcut değere eşitse öneri DEĞİL.
+    const u = fieldOf(d.ulke, d.neden);
+    if (u.yeni !== undefined) {
+      const v = String(u.yeni).trim();
+      if (COUNTRY_VOCAB.includes(v) && v !== row.country) {
+        change.country = v; reasons.country = u.neden;
+      }
     }
+
+    // ⚠️ Bölüm: SİLME yalnız açık "YOK" sentinel'iyle olur. Model `null`'ı
+    // "değişiklik yok" anlamında da kullanıyor (ölçüldü 2026-08-18: zaten
+    // gundem olan 20 kaynağa `"bolum":null` + gerekçe olarak KURALIN KENDİSİ
+    // — "gündem kaynaklarına null önerilmez" — döndürdü). Eski kod bunu
+    // "section'ı NULL yap" sanıyordu; --apply o kaynakların bölümünü silerdi.
+    const b = fieldOf(d.bolum, d.neden);
+    if (b.yeni !== undefined && b.yeni !== null) {
+      const v = String(b.yeni).trim();
+      if (v === WIPE) {
+        if (row.section !== null) { change.section = null; reasons.section = b.neden; }
+      } else if (SECTIONS.includes(v) && v !== row.section) {
+        change.section = v; reasons.section = b.neden;
+      }
+    }
+
+    if (Object.keys(change).length) out.push({ row, change, reasons });
   }
   return out;
 }
 
 async function main() {
   const sb = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
+
+  // --from: önceden üretilmiş (ve İNSAN TARAFINDAN AYIKLANMIŞ) bulguları
+  // uygular. Yeniden denetim çalıştırmaz — model kararı ile uygulama arasına
+  // insan girsin diye ayrıldı.
+  const fromIdx = process.argv.indexOf("--from");
+  if (fromIdx > -1) {
+    const file = process.argv[fromIdx + 1];
+    const saved = JSON.parse(readFileSync(file, "utf8"));
+    log(`${file}: ${saved.length} bulgu okundu`);
+    if (!APPLY) { log("--apply verilmedi, hiçbir şey yazılmadı"); return; }
+    let ok = 0;
+    for (const f of saved) {
+      const { error: e } = await sb.from("sources").update(f.change).eq("id", f.id);
+      if (e) log("yazma hatası", f.url, e.message); else ok++;
+    }
+    log(`${ok}/${saved.length} kaynak güncellendi`);
+    return;
+  }
   let q = sb.from("sources").select("id,url,name,country,section,category,priority").order("priority", { ascending: false }).order("id");
   if (LIMIT) q = q.limit(LIMIT);
   const { data, error } = await q;
   if (error) { log("okuma hatası", error.message); process.exit(1); }
   const { data: vocab } = await sb.from("sources").select("country").not("country", "is", null);
   COUNTRY_VOCAB = [...new Set((vocab || []).map((v) => v.country))].sort();
-  log(`denetlenecek kaynak: ${data.length}, parti boyu ${BATCH}, ülke sözlüğü ${COUNTRY_VOCAB.length}`);
+  log(`denetlenecek kaynak: ${data.length}, parti boyu ${BATCH}, ülke sözlüğü ${COUNTRY_VOCAB.length}, model ${MODEL}`);
 
   const batches = [];
   for (let i = 0; i < data.length; i += BATCH) batches.push(data.slice(i, i + BATCH));
 
   const findings = [];
   let cursor = 0;
+  let failed = 0;
   async function worker() {
     for (;;) {
       const i = cursor++;
@@ -141,23 +242,55 @@ async function main() {
         findings.push(...res);
         log(`parti ${i + 1}/${batches.length}: ${res.length} öneri`);
       } catch (e) {
+        failed++;
         log(`parti ${i + 1} hatası:`, e.message);
       }
     }
   }
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, batches.length) }, worker));
 
-  const cost = (usage.in / 1e6) * 0.15 + (usage.out / 1e6) * 0.6;
-  log(`\n=== ${findings.length} öneri (${data.length} kaynakta) ===`);
+  const [pIn, pOut] = PRICES[MODEL] || PRICES["gpt-4o-mini"];
+  const cost = (usage.in / 1e6) * pIn + (usage.out / 1e6) * pOut;
+  // ⚠️ Düşen parti sayısı GÖRÜNÜR olmalı: hepsi düşse bile eski sürüm
+  // "0 öneri" yazıp sıfır hatayla bitiyordu — temiz denetim gibi okunuyordu.
+  if (failed) log(`⚠️ ${failed}/${batches.length} parti HATA aldı — sonuç EKSİK.`);
+  log(`\n=== ${findings.length} öneri (${data.length} kaynakta${failed ? `, ${failed} parti eksik` : ""}) ===`);
+  // Gerekçe alan BAŞINA yazılır. Tek `neden` alanı varken, iki alandan biri
+  // elendiğinde hayatta kalan değişikliğe ÖTEKİ alanın gerekçesi yapışıyordu.
   for (const f of findings) {
-    const parts = [];
-    if ("country" in f.change) parts.push(`ülke ${f.row.country} → ${f.change.country}`);
-    if ("section" in f.change) parts.push(`bölüm ${f.row.section || "yok"} → ${f.change.section || "yok"}`);
-    console.log(`  ${f.row.priority ? "★" : " "} ${hostOf(f.row.url).padEnd(30)} ${parts.join(", ")}  — ${f.neden}`);
+    console.log(`  ${f.row.priority ? "★" : " "} ${labelOf(f.row.url).padEnd(52)}`);
+    if ("country" in f.change) {
+      console.log(`      ülke   ${String(f.row.country || "yok").padEnd(22)} → ${f.change.country}   — ${f.reasons.country || "(gerekçe yok)"}`);
+    }
+    if ("section" in f.change) {
+      console.log(`      bölüm  ${String(f.row.section || "yok").padEnd(22)} → ${f.change.section || "YOK (silinir)"}   — ${f.reasons.section || "(gerekçe yok)"}`);
+    }
   }
   log(`maliyet: ${usage.calls} çağrı, ${usage.in}+${usage.out} token, $${cost.toFixed(4)}`);
 
+  if (JSON_OUT) {
+    writeFileSync(JSON_OUT, JSON.stringify(findings.map((f) => ({
+      id: f.row.id, url: f.row.url, name: f.row.name,
+      mevcut: { country: f.row.country, section: f.row.section },
+      change: f.change, reasons: f.reasons, priority: f.row.priority,
+    })), null, 2));
+    log(`bulgular yazıldı: ${JSON_OUT}`);
+  }
+
+  const wipes = findings.filter((f) => "section" in f.change && f.change.section === null);
+  if (wipes.length) log(`⚠️ ${wipes.length} öneri bölümü SİLİYOR — uygulamadan önce tek tek bak.`);
+
   if (!APPLY) { log("rapor modu — hiçbir şey yazılmadı (--apply ile uygula)"); return; }
+
+  // ⚠️ Toplu bölüm silme emniyeti. 2026-08-18'de model, zaten `gundem` olan
+  // kaynaklara kuralın kendisini gerekçe yazıp `bolum:null` döndürdü; o
+  // sürümde --apply onlarca kaynağın bölümünü silerdi. Kitlesel silme artık
+  // kaza eseri geçmez.
+  if (wipes.length > WIPE_LIMIT && !FORCE) {
+    log(`DURDURULDU: ${wipes.length} bölüm silme önerisi var (sınır ${WIPE_LIMIT}).`);
+    log("Bu, denetçinin savrulduğunun bilinen imzası. Raporu doğrula; yine de istiyorsan --force ekle.");
+    process.exit(1);
+  }
   for (const f of findings) {
     const { error: e } = await sb.from("sources").update(f.change).eq("id", f.row.id);
     if (e) log("yazma hatası", f.row.url, e.message);
