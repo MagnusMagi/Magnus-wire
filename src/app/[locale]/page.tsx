@@ -2,7 +2,7 @@ import Link from "next/link";
 import { CatNav } from "@/components/CatNav";
 import { Dispatch } from "@/components/Dispatch";
 import { SignalPanel, MostReadPanel, FollowPanel } from "@/components/Rail";
-import { DispatchCover } from "@/components/DispatchCover";
+import { DispatchPhoto } from "@/components/DispatchPhoto";
 import { SourceLink } from "@/components/SourceLink";
 import { getDispatches, agoLabel, latestTs } from "@/lib/dispatches";
 import { sectionLabel } from "@/lib/site";
@@ -56,7 +56,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
                     <div><SourceLink url={lead.sourceUrl} name={lead.sourceName} locale={locale} compact /></div>
                   </div>
                   <Link href={`/${locale}/dispatch/${lead.slug}`} aria-hidden tabIndex={-1}>
-                    <DispatchCover slug={lead.slug} section={lead.section} locale={locale} />
+                    <DispatchPhoto hero={lead.hero} heroCredit={lead.heroCredit} slug={lead.slug} section={lead.section} locale={locale} title={lead.title} />
                   </Link>
                 </div>
               </article>

@@ -1,10 +1,17 @@
 import { supabaseServer } from "./supabase";
 import { t, type Locale } from "./i18n";
 
+/** CC atfı için gereken alanlar; lisans şartı olduğu için görselle birlikte saklanır. */
+export interface HeroCredit {
+  creator: string; license: string; licenseUrl?: string;
+  sourceUrl?: string; title?: string; provider?: string; query?: string;
+}
+
 export interface Dispatch {
   slug: string; kicker: string; section: string; region: string | null;
   /** Bilinen bir çatışmaya ait mi (bkz site.ts CONFLICTS). Çoğu telde null. */
   conflict: string | null;
+  heroCredit: HeroCredit | null;
   title: string; summary: string; body: string; keyFacts: string[];
   tags: string[]; hero: string | null; live: boolean; author: string;
   readMinutes: number; publishedAt: string; date: string; time: string;
@@ -24,7 +31,7 @@ const timeFmt = new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit"
 interface LocalContent { title?: string; summary?: string; body?: string; keyFacts?: string[]; }
 interface Row {
   slug: string; kicker: string; section: string; region: string | null;
-  conflict: string | null;
+  conflict: string | null; hero_credit: HeroCredit | null;
   title: string; summary: string; body: string;
   tags: string[] | null; hero: string | null; live: boolean | null;
   author: string | null; published_at: string;
@@ -45,7 +52,7 @@ function mapRow(r: Row, locale: Locale): Dispatch {
   const words = (body || "").trim().split(/\s+/).length;
   return {
     slug: r.slug, kicker: r.kicker, section: r.section, region: r.region ?? null,
-    conflict: r.conflict ?? null,
+    conflict: r.conflict ?? null, heroCredit: r.hero_credit ?? null,
     title, summary, body, keyFacts,
     tags: r.tags ?? [], hero: r.hero, live: r.live ?? false, author: r.author ?? "Tel Masası",
     readMinutes: Math.max(1, Math.round(words / 200)),
@@ -55,7 +62,7 @@ function mapRow(r: Row, locale: Locale): Dispatch {
   };
 }
 
-const COLS = "slug,kicker,section,region,conflict,title,summary,body,tags,hero,live,author,published_at,source_url,source_name,content";
+const COLS = "slug,kicker,section,region,conflict,hero_credit,title,summary,body,tags,hero,live,author,published_at,source_url,source_name,content";
 
 export async function getDispatches(locale: Locale, limit = 60): Promise<Dispatch[]> {
   const sb = supabaseServer();
