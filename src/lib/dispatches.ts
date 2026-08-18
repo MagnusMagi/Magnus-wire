@@ -3,6 +3,8 @@ import { t, type Locale } from "./i18n";
 
 export interface Dispatch {
   slug: string; kicker: string; section: string; region: string | null;
+  /** Bilinen bir çatışmaya ait mi (bkz site.ts CONFLICTS). Çoğu telde null. */
+  conflict: string | null;
   title: string; summary: string; body: string; keyFacts: string[];
   tags: string[]; hero: string | null; live: boolean; author: string;
   readMinutes: number; publishedAt: string; date: string; time: string;
@@ -22,6 +24,7 @@ const timeFmt = new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit"
 interface LocalContent { title?: string; summary?: string; body?: string; keyFacts?: string[]; }
 interface Row {
   slug: string; kicker: string; section: string; region: string | null;
+  conflict: string | null;
   title: string; summary: string; body: string;
   tags: string[] | null; hero: string | null; live: boolean | null;
   author: string | null; published_at: string;
@@ -42,6 +45,7 @@ function mapRow(r: Row, locale: Locale): Dispatch {
   const words = (body || "").trim().split(/\s+/).length;
   return {
     slug: r.slug, kicker: r.kicker, section: r.section, region: r.region ?? null,
+    conflict: r.conflict ?? null,
     title, summary, body, keyFacts,
     tags: r.tags ?? [], hero: r.hero, live: r.live ?? false, author: r.author ?? "Tel Masası",
     readMinutes: Math.max(1, Math.round(words / 200)),
@@ -51,7 +55,7 @@ function mapRow(r: Row, locale: Locale): Dispatch {
   };
 }
 
-const COLS = "slug,kicker,section,region,title,summary,body,tags,hero,live,author,published_at,source_url,source_name,content";
+const COLS = "slug,kicker,section,region,conflict,title,summary,body,tags,hero,live,author,published_at,source_url,source_name,content";
 
 export async function getDispatches(locale: Locale, limit = 60): Promise<Dispatch[]> {
   const sb = supabaseServer();
@@ -79,6 +83,32 @@ export async function dispatchesByRegion(locale: Locale, region: string): Promis
   const { data, error } = await sb.from("dispatches").select(COLS).eq("region", region).order("published_at", { ascending: false }).limit(60);
   if (error || !data) return [];
   return (data as Row[]).map((r) => mapRow(r, locale));
+}
+
+export async function dispatchesByConflict(locale: Locale, conflict: string, limit = 60): Promise<Dispatch[]> {
+  const sb = supabaseServer();
+  const { data, error } = await sb.from("dispatches").select(COLS).eq("conflict", conflict).order("published_at", { ascending: false }).limit(limit);
+  if (error || !data) return [];
+  return (data as Row[]).map((r) => mapRow(r, locale));
+}
+
+/**
+ * Savaş hub'ı için: her çatışmanın tel sayısı + en yeni teli.
+ * Tek sorgu — cephe başına ayrı sorgu atmak N+1 olurdu ve toplam tel sayısı
+ * (bugün ~250) tek seferde rahatça okunuyor.
+ */
+export async function conflictSummary(locale: Locale): Promise<Record<string, { count: number; latest: Dispatch | null }>> {
+  const sb = supabaseServer();
+  const { data, error } = await sb.from("dispatches").select(COLS)
+    .not("conflict", "is", null).order("published_at", { ascending: false }).limit(400);
+  if (error || !data) return {};
+  const out: Record<string, { count: number; latest: Dispatch | null }> = {};
+  for (const r of data as Row[]) {
+    const k = r.conflict as string;
+    if (!out[k]) out[k] = { count: 0, latest: mapRow(r, locale) };  // sıralı geldiği için ilki en yenisi
+    out[k].count++;
+  }
+  return out;
 }
 
 export function agoLabel(d: Dispatch, anchorTs: number, locale: Locale): string {

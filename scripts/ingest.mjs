@@ -57,6 +57,16 @@ const CONCURRENCY = Number(process.env.INGEST_CONCURRENCY || 12);
 // Düşük tutuluyor: FIFO rotasyonda bir kaynak tam devir başına YALNIZ BİR KEZ
 // denenir (1421 kaynak / 60 = ~24 koşu ≈ yarım gün), yani her hata ayrı bir güne
 // denk gelir. 10 olsaydı ölü bir feed ~5 gün havuzda slot işgal ederdi.
+// ⚠️ Çatışma etiketi `section`/`region`ın YERİNE geçmez, ÜZERİNE biner: bir
+// Ukrayna haberi hem `gundem` bölümüne hem `avrupa` bölgesine hem de
+// `rusya-ukrayna` cephesine aittir. Bu yüzden TOPICS'e eklenmedi — eklenseydi
+// haber `savas` bölümüne gidip gündemden düşerdi. Anahtarlar site.ts'teki
+// CONFLICTS ile BİREBİR aynı olmalı (sayfa rotaları o slug'lardan üretiliyor).
+const CONFLICTS = {
+  "rusya-ukrayna": "Rusya'nın Ukrayna'ya karşı savaşı: cephe, saldırılar, barış görüşmeleri, yaptırımlar, askerî/insani yardım, savaşın doğrudan siyasi ve ekonomik sonuçları.",
+  "usa-iran": "ABD ile İran arasındaki askerî/siyasi çatışma: doğrudan saldırılar, nükleer program müzakereleri, yaptırımlar, vekil güçler üzerinden çatışmalar, tehdit ve misilleme açıklamaları.",
+};
+
 const FAIL_LIMIT = Number(process.env.INGEST_FAIL_LIMIT || 3);
 // ⚠️ GEÇİCİ hata KALICI kapatmaya yol açmamalı. Ölçüm 2026-08-18: kapatılmış
 // 178 kaynağın 84'ü (%47) ölü değildi — 403 engelleme 64, 429 hız sınırı 9,
@@ -172,7 +182,7 @@ async function rewrite(item, source = {}) {
   const originLine = source.country && source.country !== "Global"
     ? `Bu kaynak ${source.country} yayınıdır. Bu YALNIZCA bağlamdır — bölgeyi haberin KONUSUNA göre seç, kaynağın ülkesini otomatik kopyalama. Haber başka bir ülkeyi anlatıyorsa o ülkenin bölgesini yaz.`
     : `Bu kaynak küresel bir yayındır; bölgeyi haberin konusundan çıkar.`;
-  const user = `Kaynak: ${source.name || item.title}\n${originLine}\n\nKaynak başlık: ${item.title}\nKaynak metin: ${snippet}\n\nGövdeyi SADECE Türkçe yaz. "en" ve "et" için yalnızca başlık ve spot'un çevirisini ver — gövde YAZMA. SADECE şu JSON'u döndür:\n{\n "section": "şunlardan biri: ${Object.keys(TOPICS).join(", ")}",\n "region": "haberin KONUSU hangi coğrafyaysa şunlardan TAM BİRİ — DAHA SPESİFİK OLANI SEÇ: turkiye (Türkiye), estonya (Estonya), abd (ABD), avrupa (diğer Avrupa ülkeleri), asya (Japonya, Çin, Hindistan, Orta Doğu, Güneydoğu Asya...), amerika (ABD DIŞINDAKİ Amerika: Kanada, Meksika, Brezilya, Arjantin...), afrika (Afrika ülkeleri), okyanusya (Avustralya, Yeni Zelanda), dunya (belirli bir ülkeyle ilgili olmayan küresel haberler)",\n "tags": ["2-4 küçük harf etiket"],\n "tr": {"title":"≤90 karakter", "summary":"tek cümle spot", "body":"${bodyRule}", "keyFacts":["ZORUNLU, 3-5 madde — ${factsRule}"]},\n "en": {"title":"tr.title'ın İngilizcesi", "summary":"tr.summary'nin İngilizcesi"},\n "et": {"title":"tr.title'ın Estoncası", "summary":"tr.summary'nin Estoncası"}\n}`;
+  const user = `Kaynak: ${source.name || item.title}\n${originLine}\n\nKaynak başlık: ${item.title}\nKaynak metin: ${snippet}\n\nGövdeyi SADECE Türkçe yaz. "en" ve "et" için yalnızca başlık ve spot'un çevirisini ver — gövde YAZMA. SADECE şu JSON'u döndür:\n{\n "section": "şunlardan biri: ${Object.keys(TOPICS).join(", ")}",\n "region": "haberin KONUSU hangi coğrafyaysa şunlardan TAM BİRİ — DAHA SPESİFİK OLANI SEÇ: turkiye (Türkiye), estonya (Estonya), abd (ABD), avrupa (diğer Avrupa ülkeleri), asya (Japonya, Çin, Hindistan, Orta Doğu, Güneydoğu Asya...), amerika (ABD DIŞINDAKİ Amerika: Kanada, Meksika, Brezilya, Arjantin...), afrika (Afrika ülkeleri), okyanusya (Avustralya, Yeni Zelanda), dunya (belirli bir ülkeyle ilgili olmayan küresel haberler)",\n "conflict": "haber şu çatışmalardan BİRİNİN doğrudan parçasıysa onun anahtarı, DEĞİLSE null — ${Object.entries(CONFLICTS).map(([k, v]) => `${k}: ${v}`).join(" | ")}. ⚠️ Emin değilsen null yaz. Sadece 'savaş' ya da 'ordu' geçmesi yetmez; haber o çatışmanın kendisiyle ilgili OLMALI. Başka bir savaş (Gazze, Sudan, Yemen...) bu listede YOK, onlar için null.",\n "tags": ["2-4 küçük harf etiket"],\n "tr": {"title":"≤90 karakter", "summary":"tek cümle spot", "body":"${bodyRule}", "keyFacts":["ZORUNLU, 3-5 madde — ${factsRule}"]},\n "en": {"title":"tr.title'ın İngilizcesi", "summary":"tr.summary'nin İngilizcesi"},\n "et": {"title":"tr.title'ın Estoncası", "summary":"tr.summary'nin Estoncası"}\n}`;
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_API_KEY}` },
@@ -191,6 +201,9 @@ async function rewrite(item, source = {}) {
   // Sınıflandırılamayan öğe "gundem"e düşer. (Eskiden "yapay-zeka" idi; havuz
   // teknoloji dışına açılınca alakasız haberleri AI bölümüne dolduruyordu.)
   if (!TOPICS[o.section]) o.section = "gundem";
+  // Modelin uydurduğu ya da "yok"/"none" gibi serbest metin yazdığı değerleri
+  // ele: yalnız tanımlı anahtarlar geçer, gerisi null (= çatışmasız).
+  o.conflict = typeof o.conflict === "string" && CONFLICTS[o.conflict] ? o.conflict : null;
   o.region = REGIONS.has(o.region) ? o.region : null;
   o.tags = Array.isArray(o.tags) ? o.tags.slice(0, 4).map((t) => slugify(String(t))) : [];
   // TR tam doğrulanır: gövde + keyFacts kalite eşiği burada.
@@ -442,7 +455,7 @@ async function main() {
       const hero = extractImage(item) || (await fetchOgImage(item.link));
       const slug = `${slugify(o.tr.title)}-${shortHash(item.link)}`;
       const row = {
-        slug, kicker: TOPICS[o.section], section: o.section, region: o.region, tags: o.tags,
+        slug, kicker: TOPICS[o.section], section: o.section, region: o.region, conflict: o.conflict, tags: o.tags,
         hero, live: false, author: "Tel Masası", source_url: item.link, source_name: feedTitle,
         published_at: item.isoDate || new Date().toISOString(),
         title: o.tr.title, summary: o.tr.summary, body: o.tr.body,

@@ -68,11 +68,26 @@ export const DASHBOARDS: Section[] = TOPICS.filter((s) =>
   DASHBOARD_SLUGS.includes(s.slug as (typeof DASHBOARD_SLUGS)[number]),
 );
 
+// ── Savaş / çatışma boyutu ────────────────────────────────────────────────
+// `section` ve `region`dan AYRI bir eksen: bir savaş haberi aynı anda `gundem`
+// bölümüne ve `avrupa` bölgesine aittir; çatışma etiketi onların YERİNE geçmez,
+// üzerine biner. Bu yüzden TOPICS'e eklenmiyor — eklenseydi ingest haberi
+// `savas` bölümüne atayıp `gundem`den çıkarırdı.
+export const CONFLICTS: Section[] = [
+  { slug: "rusya-ukrayna", kind: "topic", label: { tr: "Rusya–Ukrayna", en: "Russia–Ukraine", et: "Venemaa–Ukraina" } },
+  { slug: "usa-iran", kind: "topic", label: { tr: "ABD–İran", en: "US–Iran", et: "USA–Iraan" } },
+];
+export const CONFLICT_SLUGS = CONFLICTS.map((c) => c.slug);
+export const isConflictSlug = (x: string): boolean => CONFLICT_SLUGS.includes(x);
+export const conflictLabel = (slug: string, locale: Locale): string =>
+  CONFLICTS.find((c) => c.slug === slug)?.label[locale] ?? slug;
+
 // Nav'ın PANO grubunda görünen ama içerik BÖLÜMÜ olmayan sayfalar.
 // TOPICS'e eklenmiyor: ingest oraya haber sınıflandırmamalı, /[slug] rotası da
 // bunları kategori sanmamalı — yalnız sunum katmanında görünürler.
 export const EXTRA_PANELS: Section[] = [
   { slug: "hikayeler", kind: "topic", label: { tr: "Hikayeler", en: "Stories", et: "Lood" } },
+  { slug: "savas", kind: "topic", label: { tr: "Savaş", en: "War", et: "Sõda" } },
 ];
 
 export const ALL_SECTIONS: Section[] = [...TOPICS, ...REGIONS, ...CONTENT_SECTIONS];
