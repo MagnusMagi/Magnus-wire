@@ -15,6 +15,7 @@
 // koşu başına birkaç kuruş.
 import { createClient } from "@supabase/supabase-js";
 import { loadEnv, requireEnv } from "./env.mjs";
+import { CONFLICTS, conflictAllowed } from "./lib/conflicts.mjs";
 
 loadEnv();
 const [SUPABASE_URL, SERVICE_ROLE, OPENAI_API_KEY] = requireEnv(
@@ -29,11 +30,6 @@ const ALL = process.argv.includes("--all");
 const BATCH = Number(process.env.CONFLICT_BATCH || 15);
 const log = (...a) => console.log(new Date().toISOString(), ...a);
 
-// site.ts CONFLICTS + ingest.mjs CONFLICTS ile BİREBİR aynı anahtarlar.
-const CONFLICTS = {
-  "rusya-ukrayna": "Rusya'nın Ukrayna'ya karşı savaşı: cephe, saldırılar, barış görüşmeleri, yaptırımlar, askerî/insani yardım, savaşın doğrudan siyasi ve ekonomik sonuçları.",
-  "usa-iran": "ABD ile İran arasındaki askerî/siyasi çatışma: doğrudan saldırılar, nükleer program müzakereleri, yaptırımlar, vekil güçler üzerinden çatışmalar, tehdit ve misilleme açıklamaları.",
-};
 
 // Ucuz ön eleme. Geniş tutulur (yanlış pozitif ucuz, yanlış negatif teli
 // tamamen kaçırır); son kararı model verir.
@@ -77,6 +73,8 @@ SADECE şu JSON'u döndür (yalnız çatışmaya AİT olanları listele, gerisin
     const row = rows[Number(m.i) - 1];
     if (!row) continue;
     if (!CONFLICTS[m.conflict]) continue;          // uydurma anahtarı ele
+    // Aynı emniyet ingest'te de var: ülke/taraf başlıkta ya da spotta geçmeli.
+    if (!conflictAllowed(m.conflict, { title: row.title, summary: row.summary })) continue;
     if (row.conflict === m.conflict) continue;     // zaten doğru
     out.push({ row, conflict: m.conflict, neden: String(m.neden || "").slice(0, 100) });
   }

@@ -1,5 +1,6 @@
 // MagiWire — RSS → OpenAI (TR/EN/ET + bölge) → Supabase
 import Parser from "rss-parser";
+import { CONFLICTS, conflictAllowed } from "./lib/conflicts.mjs";
 import { FEED_SEED } from "./feeds.seed.mjs";
 import { createClient } from "@supabase/supabase-js";
 import { loadEnv } from "./env.mjs";
@@ -62,10 +63,6 @@ const CONCURRENCY = Number(process.env.INGEST_CONCURRENCY || 12);
 // `rusya-ukrayna` cephesine aittir. Bu yüzden TOPICS'e eklenmedi — eklenseydi
 // haber `savas` bölümüne gidip gündemden düşerdi. Anahtarlar site.ts'teki
 // CONFLICTS ile BİREBİR aynı olmalı (sayfa rotaları o slug'lardan üretiliyor).
-const CONFLICTS = {
-  "rusya-ukrayna": "Rusya'nın Ukrayna'ya karşı savaşı: cephe, saldırılar, barış görüşmeleri, yaptırımlar, askerî/insani yardım, savaşın doğrudan siyasi ve ekonomik sonuçları.",
-  "usa-iran": "ABD ile İran arasındaki askerî/siyasi çatışma: doğrudan saldırılar, nükleer program müzakereleri, yaptırımlar, vekil güçler üzerinden çatışmalar, tehdit ve misilleme açıklamaları.",
-};
 
 const FAIL_LIMIT = Number(process.env.INGEST_FAIL_LIMIT || 3);
 // ⚠️ GEÇİCİ hata KALICI kapatmaya yol açmamalı. Ölçüm 2026-08-18: kapatılmış
@@ -256,6 +253,12 @@ async function rewrite(item, source = {}) {
   // Modelin uydurduğu ya da "yok"/"none" gibi serbest metin yazdığı değerleri
   // ele: yalnız tanımlı anahtarlar geçer, gerisi null (= çatışmasız).
   o.conflict = typeof o.conflict === "string" && CONFLICTS[o.conflict] ? o.conflict : null;
+  // ⚠️ İKİNCİ EMNİYET: etiket ancak ülke/taraf BAŞLIKTA ya da SPOTTA geçiyorsa
+  // kalır. Prompt "uzak yan etki için null yaz" diyor ama model uymuyor —
+  // ölçülen vaka: İngiltere işgücü haberi `usa-iran` etiketi almıştı, çünkü
+  // gövdesinde tek cümle "İran savaşının başlamasıyla enerji maliyetleri..."
+  // geçiyordu. Çatışma haberin KONUSUYSA başlıkta/spotta görünür.
+  if (o.conflict && !conflictAllowed(o.conflict, { title: o.tr?.title, summary: o.tr?.summary })) o.conflict = null;
   o.region = REGIONS.has(o.region) ? o.region : null;
   o.tags = Array.isArray(o.tags) ? o.tags.slice(0, 4).map((t) => slugify(String(t))) : [];
   // TR tam doğrulanır: gövde + keyFacts kalite eşiği burada.
