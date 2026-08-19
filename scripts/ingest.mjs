@@ -21,12 +21,16 @@ const MAX_PER_RUN = Number(process.env.INGEST_MAX || 6);
 // kural haline gelir: global budama en eskileri bölüm ayırmadan siler ve
 // bölüm-başına kotanın çözdüğü sorun (gundem'in vitrini kaplaması) geri gelir.
 // Bugünkü tavanlar: 60+40+40+40 + 13x25 = 505 → 600 makul bir pay bırakıyor.
-const KEEP = Number(process.env.INGEST_KEEP || 600);
+// ⚠️ Üretim BUDAMADAN çok daha hızlı: günde 165 tel üretiliyor ama tavanlar
+// toplamı ~505'te tutuyordu, yani ödenmiş içeriğin büyük kısmı birkaç günde
+// siliniyordu ve site "az haber var" görünüyordu. Tavanı yükseltmek EK MALİYET
+// GETİRMEZ — haber zaten üretiliyor, sadece daha uzun duruyor.
+const KEEP = Number(process.env.INGEST_KEEP || 1000);
 // Bölüm başına tutulan haber sayısı. Global budama gündem'in (havuzun ~%37'si)
 // vitrini kaplamasına yol açıyordu: 200 haberin 91'i gundem'ken oyun/otomobil/
 // savunma/yaşam bölümleri TAMAMEN boştu. Artık her bölüm kendi penceresinde
 // yarışıyor → niş bölümler dolu kalıyor, gündem kendi kendini deviriyor.
-const KEEP_PER_SECTION = Number(process.env.INGEST_KEEP_PER_SECTION || 25);
+const KEEP_PER_SECTION = Number(process.env.INGEST_KEEP_PER_SECTION || 40);
 // ⚠️ Tek bir sayı her bölüme uymuyor: tavan ÜRETİM HIZIYLA birlikte devir
 // süresini belirliyor. Ölçüm 2026-08-18 — gundem günde 22 haber üretip 25
 // slota sığdığı için oradaki bir başlık yalnız ~1,1 GÜN yaşıyordu; aynı anda
@@ -38,7 +42,7 @@ const KEEP_PER_SECTION = Number(process.env.INGEST_KEEP_PER_SECTION || 25);
 // belirliyor. INGEST_KEEP_PER_SECTION_OVERRIDES ile ezilebilir
 // (biçim: "gundem=60,finans=40").
 const KEEP_OVERRIDES = Object.fromEntries(
-  (process.env.INGEST_KEEP_PER_SECTION_OVERRIDES || "gundem=60,finans=40,yazilim=40,donanim=40")
+  (process.env.INGEST_KEEP_PER_SECTION_OVERRIDES || "gundem=80,finans=50,yazilim=50,donanim=50")
     .split(",").map((p) => p.split("=")).filter((p) => p.length === 2 && Number(p[1]) > 0)
     .map(([k, v]) => [k.trim(), Number(v)]),
 );

@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { passGate } from "./gate";
 
 const WIDTHS = [320, 375, 414];
-const paths = ["/tr", "/tr/borsa", "/tr/hava", "/tr/deprem", "/tr/savas", "/tr/savas/rusya-ukrayna", "/tr/hikayeler"];
+const paths = ["/tr", "/tr/borsa", "/tr/hava", "/tr/deprem", "/tr/savas", "/tr/savas/rusya-ukrayna", "/tr/hikayeler", "/tr/arsiv", "/tr/arsiv?bolum=siber"];
 
 test.beforeEach(async ({ context, baseURL }) => {
   await passGate(context, baseURL);
@@ -57,6 +57,15 @@ test("nav son öğe (ABD) erişilebilir", async ({ page }) => {
   const last = page.getByRole("navigation", { name: "sections" }).getByRole("link", { name: "ABD" });
   await last.scrollIntoViewIfNeeded();
   await expect(last).toBeVisible();
+});
+
+test("arşiv filtresi listeyi daraltıyor", async ({ page }) => {
+  await page.goto("/tr/arsiv");
+  const hepsi = await page.locator('a[href^="/tr/dispatch/"]').count();
+  await page.goto("/tr/arsiv?bolum=siber");
+  const suzulmus = await page.locator('a[href^="/tr/dispatch/"]').count();
+  expect(suzulmus).toBeGreaterThan(0);
+  expect(suzulmus).toBeLessThan(hepsi);
 });
 
 test("Savaş panosu nav'da ve cephelere gidiyor", async ({ page }) => {
