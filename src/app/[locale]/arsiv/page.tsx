@@ -81,14 +81,20 @@ export default async function ArchivePage({ params, searchParams }: {
             responsive testinde taşma sayılmaz (bkz e2e/responsive.spec.ts). */}
         <div className="mt-5 flex flex-col gap-2">
           <div className="flex items-center gap-2">
-            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-ink-3 shrink-0 w-[52px]">
+            {/* ⚠️ SABİT GENİŞLİK YOK. `w-[52px]` Türkçe "Bölüm/Bölge"yi sınırda
+                bırakıyor, İngilizce "Section"/"Regions" ve Estonca karşılıkları
+                ise kesinlikle taşıyordu. `min-w` iki satırın hizasını korur ama
+                etiketin büyümesine izin verir. */}
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-ink-3 shrink-0 min-w-[58px]">
               {t(locale, "sectionWord")}
             </span>
-            {/* ⚠️ `min-w-0 flex-1` ŞART: flex çocuğunun varsayılan min-width'i
-                `auto`, yani içeriğinin tam genişliğini talep ediyor ve
-                `overflow-x-auto` hiç devreye girmeden satırı dışarı itiyor.
-                E2E bu taşmayı 320/375/414'te yakaladı. */}
-            <div className="min-w-0 flex-1 flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {/* ⚠️ KAYDIRICI DEĞİL, SARMA. Yatay kaydırıcıda 16 bölümün son
+                birkaçı ekran dışında kalıyordu ("OTOMOBİL" yarıda kesiliyordu)
+                ve kaydığına dair hiçbir görsel işaret yoktu — kullanıcı
+                filtrenin tamamını göremiyordu. Filtre çubuğu bir gezinme
+                şeridi değil, seçim yüzeyi: hepsi görünmeli.
+                `min-w-0` yine gerekli — flex çocuğu içeriğinden küçülebilsin. */}
+            <div className="min-w-0 flex-1 flex flex-wrap items-center gap-1.5">
               <Link href={href({ bolum: null })} className={chipCls(!secOk)}>{t(locale, "filterAll")}</Link>
               {NEWS_TOPICS.map((x) => (
                 <Link key={x.slug} href={href({ bolum: x.slug })} className={chipCls(secOk === x.slug)}>{x.label[locale]}</Link>
@@ -96,14 +102,20 @@ export default async function ArchivePage({ params, searchParams }: {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-ink-3 shrink-0 w-[52px]">
+            {/* ⚠️ SABİT GENİŞLİK YOK. `w-[52px]` Türkçe "Bölüm/Bölge"yi sınırda
+                bırakıyor, İngilizce "Section"/"Regions" ve Estonca karşılıkları
+                ise kesinlikle taşıyordu. `min-w` iki satırın hizasını korur ama
+                etiketin büyümesine izin verir. */}
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-ink-3 shrink-0 min-w-[58px]">
               {t(locale, "regionWord")}
             </span>
-            {/* ⚠️ `min-w-0 flex-1` ŞART: flex çocuğunun varsayılan min-width'i
-                `auto`, yani içeriğinin tam genişliğini talep ediyor ve
-                `overflow-x-auto` hiç devreye girmeden satırı dışarı itiyor.
-                E2E bu taşmayı 320/375/414'te yakaladı. */}
-            <div className="min-w-0 flex-1 flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {/* ⚠️ KAYDIRICI DEĞİL, SARMA. Yatay kaydırıcıda 16 bölümün son
+                birkaçı ekran dışında kalıyordu ("OTOMOBİL" yarıda kesiliyordu)
+                ve kaydığına dair hiçbir görsel işaret yoktu — kullanıcı
+                filtrenin tamamını göremiyordu. Filtre çubuğu bir gezinme
+                şeridi değil, seçim yüzeyi: hepsi görünmeli.
+                `min-w-0` yine gerekli — flex çocuğu içeriğinden küçülebilsin. */}
+            <div className="min-w-0 flex-1 flex flex-wrap items-center gap-1.5">
               <Link href={href({ bolge: null })} className={chipCls(!regOk)}>{t(locale, "filterAll")}</Link>
               {REGIONS.map((x) => (
                 <Link key={x.slug} href={href({ bolge: x.slug })} className={chipCls(regOk === x.slug)}>{x.label[locale]}</Link>
