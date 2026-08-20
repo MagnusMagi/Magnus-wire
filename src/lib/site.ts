@@ -88,6 +88,9 @@ export const conflictLabel = (slug: string, locale: Locale): string =>
 export const EXTRA_PANELS: Section[] = [
   { slug: "hikayeler", kind: "topic", label: { tr: "Hikayeler", en: "Stories", et: "Lood" } },
   { slug: "savas", kind: "topic", label: { tr: "Savaş", en: "War", et: "Sõda" } },
+  // ⚠️ TOPICS'e EKLENMEZ: ingest oraya haber sınıflandırmamalı ve /[slug]
+  // rotası bunu kategori sanmamalı. Kendi rotası var: /[locale]/x.
+  { slug: "x", kind: "topic", label: { tr: "X", en: "X", et: "X" } },
 ];
 
 export const ALL_SECTIONS: Section[] = [...TOPICS, ...REGIONS, ...CONTENT_SECTIONS];

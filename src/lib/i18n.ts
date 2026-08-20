@@ -35,6 +35,15 @@ const STRINGS: Record<Locale, Dict> = {
     photoIllustrative: "Temsili görsel",
     filterAll: "Tümü", filterClear: "filtreleri temizle ×",
     copy: "© 2026 MagiWire — prototip", agoNow: "az önce", agoMin: "dk önce", agoHour: "sa önce", follow: "Takip Et", followBlurb: "Otomatik, kişisel bir teknoloji akışı. RSS ile takip et.", rssBtn: "RSS akışı →", about2: "Proje hakkında →", source: "Kaynak", viaSource: "kaynak", siteLogout: "Çıkış yap", regionsLabel: "Bölge", panelsLabel: "Pano",
+    // ── X panosu ────────────────────────────────────────────────────────
+    xKicker: "Sosyal masa", xTitle: "X'te Gündem",
+    xSub: "Haberlerimizin kaynaklarında alıntılanan tweet'ler tek yerde; etkileşimine ve tazeliğine göre sıralanır, diline göre süzülür.",
+    xLangFilter: "Dil", xCount: "tel", xSortPopular: "Popüler", xSortRecent: "Yeni",
+    xEmpty: "Havuz henüz boş — tarayıcı ilk tweet'leri bekliyor.",
+    xEmptyLang: "Bu dilde tweet yok.",
+    xOpen: "X'te aç", xOpenOnX: "Tweet'i X'te aç", xQuotedIn: "şurada alıntılandı:",
+    xLikes: "beğeni", xReplies: "yanıt", xNew: "yeni tel", xOpenPhoto: "Görseli büyüt", close: "Kapat",
+    xDisclaimer: "Tweet'ler X'in açık gömme verisinden alınır ve yazarlarına aittir; MagiWire'ın görüşünü yansıtmaz. Sıralama etkileşim ve tazelik ile hesaplanır. Sayfa hiçbir ücretli X API'si kullanmaz ve tarayıcınızdan X'e istek yapmaz.",
   },
   en: {
     login: "Sign in", register: "Register", breaking: "Breaking",
@@ -60,6 +69,15 @@ const STRINGS: Record<Locale, Dict> = {
     photoIllustrative: "Illustrative photo",
     filterAll: "All", filterClear: "clear filters ×",
     copy: "© 2026 MagiWire — prototype", agoNow: "just now", agoMin: "min ago", agoHour: "h ago", follow: "Follow", followBlurb: "An automated, personal tech feed. Follow via RSS.", rssBtn: "RSS feed →", about2: "About the project →", source: "Source", viaSource: "via", siteLogout: "Log out", regionsLabel: "Regions", panelsLabel: "Panels",
+    // ── X board ─────────────────────────────────────────────────────────
+    xKicker: "Social desk", xTitle: "Talk on X",
+    xSub: "Tweets quoted by the sources behind our dispatches, gathered in one place — ranked by engagement and freshness, filtered by language.",
+    xLangFilter: "Language", xCount: "posts", xSortPopular: "Popular", xSortRecent: "Latest",
+    xEmpty: "The pool is still empty — the scanner is waiting for its first tweets.",
+    xEmptyLang: "No tweets in this language.",
+    xOpen: "Open on X", xOpenOnX: "Open this post on X", xQuotedIn: "quoted in",
+    xLikes: "likes", xReplies: "replies", xNew: "new posts", xOpenPhoto: "Enlarge photo", close: "Close",
+    xDisclaimer: "Posts come from X's public embed data and belong to their authors; they do not reflect MagiWire's views. Ranking combines engagement and freshness. This page uses no paid X API and makes no requests from your browser to X.",
   },
   et: {
     login: "Logi sisse", register: "Registreeru", breaking: "Värske",
@@ -85,6 +103,15 @@ const STRINGS: Record<Locale, Dict> = {
     photoIllustrative: "Illustreeriv foto",
     filterAll: "Kõik", filterClear: "tühjenda filtrid ×",
     copy: "© 2026 MagiWire — prototüüp", agoNow: "äsja", agoMin: "min tagasi", agoHour: "t tagasi", follow: "Jälgi", followBlurb: "Automaatne isiklik tehnoloogiavoog. Jälgi RSS kaudu.", rssBtn: "RSS-voog →", about2: "Projektist →", source: "Allikas", viaSource: "allikas", siteLogout: "Logi välja", regionsLabel: "Piirkond", panelsLabel: "Paneelid",
+    // ── X paneel ────────────────────────────────────────────────────────
+    xKicker: "Sotsiaallaud", xTitle: "Jutt X-is",
+    xSub: "Meie uudiste allikates tsiteeritud säutsud ühes kohas — järjestatud kaasatuse ja värskuse järgi, filtreeritud keele kaupa.",
+    xLangFilter: "Keel", xCount: "postitust", xSortPopular: "Populaarsed", xSortRecent: "Värsked",
+    xEmpty: "Kogum on veel tühi — skanner ootab esimesi säutse.",
+    xEmptyLang: "Selles keeles säutse pole.",
+    xOpen: "Ava X-is", xOpenOnX: "Ava postitus X-is", xQuotedIn: "tsiteeritud:",
+    xLikes: "meeldimist", xReplies: "vastust", xNew: "uut postitust", xOpenPhoto: "Suurenda pilti", close: "Sulge",
+    xDisclaimer: "Postitused pärinevad X-i avalikest manustamisandmetest ja kuuluvad nende autoritele; need ei väljenda MagiWire'i seisukohti. Järjestus arvestab kaasatust ja värskust. Leht ei kasuta ühtegi tasulist X API-t ega tee teie brauserist päringuid X-i.",
   },
 };
 
