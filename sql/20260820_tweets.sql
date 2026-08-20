@@ -223,3 +223,51 @@ create index if not exists sources_x_productive_idx
   on public.sources (x_found_count desc) where active and x_found_count > 0;
 
 notify pgrst, 'reload schema';
+
+-- ── Bağımsız X kaynak havuzu ──────────────────────────────────────────────
+-- ⚠️ Haber kaynaklarından AYRI bir liste. Gerekçe ölçümle sabit:
+--   • Türk beslemelerinin RSS gövdesi BOŞ: 18 sitede 301 öğe tarandı,
+--     tweet linki SIFIR. Türk siteleri tam metni RSS'e koymuyor.
+--   • Tweet'ler MAKALE SAYFASINDA. 50 rastgele Türk makalesinde oran %6.
+--   • Ama doğru site seçilince oran uçuyor: malumatfurus.org 8/8 makale
+--     (%100), 8 makaleden 29 tweet ID. Doğrulama sitesi yalanladığı tweet'i
+--     gömmek ZORUNDA. medyascope %38, webtekno %25.
+-- Yani X keşfi için kaynak seçimi HABER değeri değil TWEET YOĞUNLUĞU
+-- ölçütüyle yapılmalı — bu yüzden `sources` tablosuna karışmıyor.
+create table if not exists public.x_sources (
+  id               bigserial primary key,
+  url              text not null unique,   -- RSS beslemesi
+  name             text not null,
+  lang             text,                   -- havuzun hedef dili ('tr')
+  country          text,
+  active           boolean not null default true,
+  -- Kendi kendini ayarlama: üretmeyen kaynak zamanla geri plana düşer.
+  found_count      integer not null default 0,
+  item_count       integer not null default 0,
+  last_scanned_at  timestamptz,
+  last_status      text,
+  fail_count       integer not null default 0,
+  created_at       timestamptz not null default now()
+);
+create index if not exists x_sources_rotation_idx
+  on public.x_sources (last_scanned_at nulls first) where active;
+
+-- Makale tarama sicili. ⚠️ Şart: bu hat RSS gövdesini değil MAKALE HTML'ini
+-- çekiyor, yani her tarama gerçek bir dış istek. Sicil olmadan aynı makaleler
+-- her koşuda yeniden indirilir ve bütçe boşa gider.
+create table if not exists public.x_article_scans (
+  url          text primary key,
+  found_count  integer not null default 0,
+  scanned_at   timestamptz not null default now()
+);
+
+alter table public.x_sources      enable row level security;
+alter table public.x_article_scans enable row level security;
+revoke all on public.x_sources      from anon, authenticated;
+revoke all on public.x_article_scans from anon, authenticated;
+revoke all on sequence public.x_sources_id_seq from anon, authenticated;
+grant all on public.x_sources       to service_role;
+grant all on public.x_article_scans to service_role;
+grant all on sequence public.x_sources_id_seq to service_role;
+
+notify pgrst, 'reload schema';

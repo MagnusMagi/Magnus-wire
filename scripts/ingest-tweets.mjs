@@ -40,6 +40,15 @@ const FEED_CONCURRENCY = Number(process.env.XI_FEED_CONCURRENCY || 10);
 // çekirdek/rotasyon ayrımıyla aynı desen, aynı gerekçe (tazelik vs genişlik).
 const XI_PRODUCTIVE_PER_RUN = Number(process.env.XI_PRODUCTIVE_PER_RUN || 40);
 
+// ── Bağımsız X kaynak hattı ──────────────────────────────────────────────
+// Haber havuzundan AYRI, yalnız tweet yoğunluğuna göre seçilmiş kaynaklar
+// (bkz scripts/x-sources.seed.mjs). Türk sitelerinin RSS gövdesi boş olduğu
+// için bu hat MAKALE SAYFASINI çekiyor — her tarama gerçek bir dış istek,
+// o yüzden hem bütçeli hem sicilli.
+const XSRC_PER_RUN = Number(process.env.XI_XSRC_PER_RUN || 8);
+const XSRC_ITEMS_PER_SOURCE = Number(process.env.XI_XSRC_ITEMS || 6);
+const XSRC_ARTICLES_PER_RUN = Number(process.env.XI_XSRC_ARTICLES || 20);
+
 // Koşu başına taranacak YENİ dispatch sayısı. ingest.mjs tur başına ~6 haber
 // ekliyor ve ikisi de 30 dakikada bir koşuyor → 12 rahat bir pay.
 const SCAN_PER_RUN = Number(process.env.XI_SCAN_PER_RUN || 12);
@@ -190,6 +199,97 @@ async function scanFeeds() {
   }
 
   return { feeds: feeds.length, ok, items, productive: prod.data?.length ?? 0, found };
+}
+
+/**
+ * BAĞIMSIZ X HATTI. Haber kaynaklarımızdan ayrı, tweet yoğunluğuna göre
+ * seçilmiş beslemeleri tarar. İki aşama:
+ *   1) RSS gövdesi (bedava) — Bianet/BirGün/Webrazzi tweet'i burada veriyor.
+ *   2) Makale sayfası (bütçeli) — Türk sitelerinin çoğu tam metni RSS'e
+ *      koymuyor; ölçüldü: 18 sitede 301 öğe, gövdede tweet linki SIFIR.
+ * Sicil (`x_article_scans`) aynı makalenin tekrar indirilmesini engeller.
+ */
+async function scanXSources() {
+  const { data: srcs, error } = await sb
+    .from("x_sources")
+    .select("id,url,name,lang,found_count")
+    .eq("active", true)
+    .order("last_scanned_at", { ascending: true, nullsFirst: true })
+    .limit(XSRC_PER_RUN);
+  if (error) throw new Error(`x_sources okuma: ${error.message}`);
+  if (!srcs?.length) return { sources: 0, articles: 0, found: new Map() };
+
+  const parser = new Parser({ timeout: FEED_TIMEOUT_MS, headers: { "User-Agent": UA_BROWSER } });
+  const found = new Map();
+  const perSource = new Map();
+  const candidates = []; // makale çekilecek adaylar
+
+  await pool(srcs, FEED_CONCURRENCY, async (s) => {
+    let parsed;
+    try {
+      parsed = await parser.parseURL(s.url);
+    } catch (e) {
+      await sb.from("x_sources").update({
+        last_scanned_at: new Date().toISOString(),
+        last_status: String(e.message).slice(0, 120),
+        fail_count: (s.fail_count ?? 0) + 1,
+      }).eq("id", s.id);
+      return;
+    }
+    for (const it of (parsed.items ?? []).slice(0, XSRC_ITEMS_PER_SOURCE)) {
+      // 1) Gövde taraması — bedava.
+      const blob = [it.content, it["content:encoded"], it.summary, it.description].filter(Boolean).join(" ");
+      for (const id of extractTweetIds(blob)) {
+        if (!found.has(id)) found.set(id, { source_name: s.name, section: null, slug: null });
+        perSource.set(s.id, (perSource.get(s.id) ?? 0) + 1);
+      }
+      // 2) Makale adayı.
+      if (it.link) candidates.push({ url: it.link, name: s.name, sourceId: s.id });
+    }
+    await sb.from("x_sources").update({
+      last_scanned_at: new Date().toISOString(),
+      last_status: "ok",
+      fail_count: 0,
+      item_count: (parsed.items ?? []).length,
+    }).eq("id", s.id);
+  });
+
+  // Sicilde olanları ele; kalanlardan bütçe kadarını çek.
+  const urls = [...new Set(candidates.map((c) => c.url))];
+  const seen = new Set();
+  for (let i = 0; i < urls.length; i += 100) {
+    const { data } = await sb.from("x_article_scans").select("url").in("url", urls.slice(i, i + 100));
+    (data ?? []).forEach((r) => seen.add(r.url));
+  }
+  const todo = candidates.filter((c) => !seen.has(c.url)).slice(0, XSRC_ARTICLES_PER_RUN);
+
+  const scanRows = [];
+  await pool(todo, CONCURRENCY, async (c) => {
+    const html = await fetchArticleHtml(c.url);
+    if (html === null) {
+      // ⚠️ Başarısız makale de sicile yazılır: erişilemeyen bir URL her koşuda
+      // yeniden denenip makale bütçesini kalıcı olarak yerdi.
+      scanRows.push({ url: c.url, found_count: -1 });
+      return;
+    }
+    const hits = extractTweetIds(html);
+    for (const id of hits) {
+      if (!found.has(id)) found.set(id, { source_name: c.name, section: null, slug: null });
+    }
+    if (hits.size) perSource.set(c.sourceId, (perSource.get(c.sourceId) ?? 0) + hits.size);
+    scanRows.push({ url: c.url, found_count: hits.size });
+  });
+
+  if (scanRows.length) {
+    const { error: e } = await sb.from("x_article_scans").upsert(scanRows, { onConflict: "url" });
+    if (e) log("makale sicili hatası:", e.message);
+  }
+  for (const [id, hits] of perSource) {
+    const prev = srcs.find((x) => x.id === id)?.found_count ?? 0;
+    await sb.from("x_sources").update({ found_count: prev + hits }).eq("id", id);
+  }
+
+  return { sources: srcs.length, articles: todo.length, found };
 }
 
 async function discover() {
@@ -484,8 +584,9 @@ async function prune() {
 async function main() {
   // İki keşif hattı paralel: biri feed gövdelerini, diğeri makale HTML'ini
   // tarıyor. Sonuçlar tek haritada birleşir (feed izi, makale izini ezmez).
-  const [feed, article] = await Promise.all([scanFeeds(), discover()]);
+  const [feed, article, xsrc] = await Promise.all([scanFeeds(), discover(), scanXSources()]);
   const found = new Map(feed.found);
+  for (const [id, src] of xsrc.found) found.set(id, src);
   for (const [id, src] of article.found) found.set(id, src); // makale izi daha zengin (dispatch slug'ı var)
 
   const { added, quoted, rejected, recovered } = await resolveNew(found);
@@ -506,7 +607,7 @@ async function main() {
 
   // Tek satırlık özet — "neden az tweet geldi?" sorusu log'dan cevaplanabilsin.
   log(
-    `özet: feed ${feed.ok}/${feed.feeds} (üretken ${feed.productive}, ${feed.items} öğe) + makale ${article.scanned} (${article.failed} erişilemedi) ` +
+    `özet: feed ${feed.ok}/${feed.feeds} (üretken ${feed.productive}, ${feed.items} öğe) + makale ${article.scanned} (${article.failed} erişilemedi) + X-kaynak ${xsrc.sources}/${xsrc.articles} ` +
       `→ ${found.size} link, eklenen ${added} (alıntı ${quoted}), tam metin ${recovered + refreshRecovered}, elenen ${rejected}, tazelenen ${updated}, kapatılan ${closed}, budanan ${deleted}`,
   );
 }
