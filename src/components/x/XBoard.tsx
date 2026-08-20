@@ -23,6 +23,10 @@ const TOP_THRESHOLD_PX = 200;
 export function XBoard({ tweets: initial, locale }: { tweets: Tweet[]; locale: Locale }) {
   const [lang, setLang] = useState<string>(ALL);
   const [sort, setSort] = useState<SortKey>("popular");
+  // ⚠️ Onaylı filtresi bir SIRALAMA ayarı değil, kapsam ayarı: havuzun %80'i
+  // zaten onaylı olduğu için "onaylıyı üste al" gibi bir puanlama anlamsız
+  // olurdu; ayırt edici olan onaysızları TAMAMEN dışarıda bırakabilmek.
+  const [onlyVerified, setOnlyVerified] = useState(false);
   const [tweets, setTweets] = useState<Tweet[]>(initial);
   // Kullanıcı listede aşağıdayken gelen yeni teller burada bekler.
   const [pending, setPending] = useState<Tweet[] | null>(null);
@@ -74,7 +78,15 @@ export function XBoard({ tweets: initial, locale }: { tweets: Tweet[]; locale: L
     return pending.filter((x) => !seen.has(x.id)).length;
   }, [pending, tweets]);
 
-  const counts = useMemo(() => langCounts(tweets), [tweets]);
+  // ⚠️ Onaylı elemesi dil çetelesinden ÖNCE uygulanır. Sonra uygulansaydı
+  // çetele "Türkçe 15" derken tıklayınca 14 kart çıkardı — sayaç, tıklandığında
+  // görülecek sayıyı göstermeli.
+  const scoped = useMemo(
+    () => (onlyVerified ? tweets.filter((x) => x.verified) : tweets),
+    [tweets, onlyVerified],
+  );
+  const counts = useMemo(() => langCounts(scoped), [scoped]);
+  const verifiedCount = useMemo(() => tweets.filter((x) => x.verified).length, [tweets]);
 
   // Durumu URL'de tut: filtrelenmiş görünüm paylaşılabilir/yer imlenebilir olsun.
   // ⚠️ İlk render sunucuyla AYNI olmalı (hidrasyon), o yüzden URL okuması
@@ -85,6 +97,7 @@ export function XBoard({ tweets: initial, locale }: { tweets: Tweet[]; locale: L
     const s = p.get("sirala");
     if (l && (l === ALL || counts.some((c) => c.code === l))) setLang(l);
     if (s === "yeni") setSort("recent");
+    if (p.get("onayli") === "1") setOnlyVerified(true);
     // counts yalnız veri değişince değişir; ilk mount'ta çalışması yeterli.
   }, [counts]);
 
@@ -94,14 +107,16 @@ export function XBoard({ tweets: initial, locale }: { tweets: Tweet[]; locale: L
     else p.set("dil", lang);
     if (sort === "popular") p.delete("sirala");
     else p.set("sirala", "yeni");
+    if (onlyVerified) p.set("onayli", "1");
+    else p.delete("onayli");
     const qs = p.toString();
     window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
-  }, [lang, sort]);
+  }, [lang, sort, onlyVerified]);
 
   const list = useMemo(() => {
-    const filtered = lang === ALL ? tweets : tweets.filter((x) => x.lang === lang);
+    const filtered = lang === ALL ? scoped : scoped.filter((x) => x.lang === lang);
     return sortTweets(filtered, sort);
-  }, [tweets, lang, sort]);
+  }, [scoped, lang, sort]);
 
   // Sinyal çubuğunun ölçeği: GÖRÜNEN listenin en yükseği. Havuzun geneline
   // göre ölçeklemek, tek bir viral tweet yüzünden diğer tüm çubukları
@@ -162,12 +177,12 @@ export function XBoard({ tweets: initial, locale }: { tweets: Tweet[]; locale: L
           {t(locale, "xLangFilter")}
         </h2>
         <ul className="hidden lg:block m-0 p-0 list-none">
-          {langRow(ALL, t(locale, "filterAll"), tweets.length, 1)}
+          {langRow(ALL, t(locale, "filterAll"), scoped.length, 1)}
           {counts.map((c) => langRow(c.code, langName(c.code, locale), c.count, c.count / maxCount))}
         </ul>
         {/* Mobil: aynı veri, yatay çip şeridi */}
         <ul className="lg:hidden flex gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden m-0 p-0 pt-2 list-none">
-          {[{ code: ALL, count: tweets.length }, ...counts].map((c) => (
+          {[{ code: ALL, count: scoped.length }, ...counts].map((c) => (
             <li key={c.code} className="flex-none">
               <button type="button" onClick={() => setLang(c.code)} aria-pressed={lang === c.code} className={tabCls(lang === c.code)}>
                 {c.code === ALL ? t(locale, "filterAll") : langName(c.code, locale)} <span className="tabular-nums opacity-70">{c.count}</span>
@@ -198,6 +213,16 @@ export function XBoard({ tweets: initial, locale }: { tweets: Tweet[]; locale: L
             {lang !== ALL && <span className="text-ink-2"> · {langName(lang, locale)}</span>}
           </span>
           <div className="flex gap-1.5">
+            <button
+              type="button"
+              onClick={() => setOnlyVerified((v) => !v)}
+              aria-pressed={onlyVerified}
+              title={`${verifiedCount} / ${tweets.length}`}
+              className={tabCls(onlyVerified)}
+            >
+              ✓ {t(locale, "xVerifiedOnly")}
+            </button>
+            <span aria-hidden className="w-px bg-line mx-0.5" />
             <button type="button" onClick={() => setSort("popular")} aria-pressed={sort === "popular"} className={tabCls(sort === "popular")}>
               {t(locale, "xSortPopular")}
             </button>
@@ -209,7 +234,11 @@ export function XBoard({ tweets: initial, locale }: { tweets: Tweet[]; locale: L
 
         {list.length === 0 ? (
           <p className="font-mono text-ink-3 py-10 text-[13px]">
-            {tweets.length === 0 ? t(locale, "xEmpty") : t(locale, "xEmptyLang")}
+            {tweets.length === 0
+              ? t(locale, "xEmpty")
+              : onlyVerified
+                ? t(locale, "xEmptyVerified")
+                : t(locale, "xEmptyLang")}
           </p>
         ) : (
           <div className="max-w-[720px]">

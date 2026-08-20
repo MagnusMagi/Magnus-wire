@@ -33,6 +33,12 @@ const [SUPABASE_URL, SERVICE_ROLE] = requireEnv("SUPABASE_URL", "SUPABASE_SERVIC
 const XI_FEEDS_PER_RUN = Number(process.env.XI_FEEDS_PER_RUN || 60);
 const FEED_TIMEOUT_MS = Number(process.env.XI_FEED_TIMEOUT_MS || 12000);
 const FEED_CONCURRENCY = Number(process.env.XI_FEED_CONCURRENCY || 10);
+// ⚠️ Üretken şerit. Ölçüldü: beslemelerin çok küçük bir azınlığı tweet gömüyor
+// (45 Türk kaynağın yalnız 4'ü). Düz FIFO'da bu kaynaklar 774'lük kuyrukta
+// sıraya girip ~2 saatte bir çekiliyordu. Daha önce tweet üretmiş kaynaklar
+// artık rotasyona TABİ DEĞİL, her koşuda çekilir — ingest.mjs'in
+// çekirdek/rotasyon ayrımıyla aynı desen, aynı gerekçe (tazelik vs genişlik).
+const XI_PRODUCTIVE_PER_RUN = Number(process.env.XI_PRODUCTIVE_PER_RUN || 40);
 
 // Koşu başına taranacak YENİ dispatch sayısı. ingest.mjs tur başına ~6 haber
 // ekliyor ve ikisi de 30 dakikada bir koşuyor → 12 rahat bir pay.
@@ -119,20 +125,30 @@ async function fetchArticleHtml(url) {
  * linki arar. Döndürdüğü harita: tweet id → { name, section } kaynak izi.
  */
 async function scanFeeds() {
-  const { data: feeds, error } = await sb
-    .from("sources")
-    .select("id,url,name,section")
-    .eq("active", true)
-    .order("x_scanned_at", { ascending: true, nullsFirst: true })
-    .limit(XI_FEEDS_PER_RUN);
-  if (error) throw new Error(`kaynak okuma: ${error.message}`);
-  if (!feeds?.length) return { feeds: 0, ok: 0, items: 0, found: new Map() };
+  // İki şerit: üretkenler (her koşu) + keşif rotasyonu (FIFO).
+  const [prod, disc] = await Promise.all([
+    sb.from("sources").select("id,url,name,section,x_found_count")
+      .eq("active", true).gt("x_found_count", 0)
+      .order("x_found_count", { ascending: false })
+      .limit(XI_PRODUCTIVE_PER_RUN),
+    sb.from("sources").select("id,url,name,section,x_found_count")
+      .eq("active", true).eq("x_found_count", 0)
+      .order("x_scanned_at", { ascending: true, nullsFirst: true })
+      .limit(XI_FEEDS_PER_RUN),
+  ]);
+  if (prod.error || disc.error) throw new Error(`kaynak okuma: ${(prod.error || disc.error).message}`);
+
+  // Aynı kaynak iki şeritte olamaz (biri >0, diğeri =0 filtresi) ama yine de
+  // kimliğe göre tekilleştiriliyor: filtreler ileride değişebilir.
+  const feeds = [...new Map([...(prod.data ?? []), ...(disc.data ?? [])].map((f) => [f.id, f])).values()];
+  if (!feeds.length) return { feeds: 0, ok: 0, items: 0, productive: 0, found: new Map() };
 
   const parser = new Parser({
     timeout: FEED_TIMEOUT_MS,
     headers: { "User-Agent": UA_BROWSER },
   });
   const found = new Map();
+  const perFeed = new Map(); // kaynak id → bu koşuda bulunan link sayısı
   let ok = 0;
   let items = 0;
 
@@ -144,6 +160,7 @@ async function scanFeeds() {
       return; // ölü/yavaş besleme: ingest.mjs zaten sayaç tutup kapatıyor
     }
     ok++;
+    let hits = 0;
     for (const it of parsed.items ?? []) {
       items++;
       // ⚠️ Tüm gövde alanları birleştirilir: bazı beslemeler tam metni
@@ -153,9 +170,11 @@ async function scanFeeds() {
         .filter(Boolean)
         .join(" ");
       for (const id of extractTweetIds(blob)) {
+        hits++;
         if (!found.has(id)) found.set(id, { source_name: f.name, section: f.section ?? null, slug: null });
       }
     }
+    if (hits) perFeed.set(f.id, hits);
   });
 
   // Rotasyon damgası: besleme çekilemese de ilerletilir, yoksa ölü bir feed
@@ -164,7 +183,13 @@ async function scanFeeds() {
   const { error: e2 } = await sb.from("sources").update({ x_scanned_at: stamp }).in("id", feeds.map((f) => f.id));
   if (e2) log("rotasyon damgası hatası:", e2.message);
 
-  return { feeds: feeds.length, ok, items, found };
+  // Üretkenlik sayacı: bir kaynak tweet ürettiyse bir daha rotasyonu beklemesin.
+  for (const [id, hits] of perFeed) {
+    const prev = feeds.find((f) => f.id === id)?.x_found_count ?? 0;
+    await sb.from("sources").update({ x_found_count: prev + hits }).eq("id", id);
+  }
+
+  return { feeds: feeds.length, ok, items, productive: prod.data?.length ?? 0, found };
 }
 
 async function discover() {
@@ -481,7 +506,7 @@ async function main() {
 
   // Tek satırlık özet — "neden az tweet geldi?" sorusu log'dan cevaplanabilsin.
   log(
-    `özet: feed ${feed.ok}/${feed.feeds} (${feed.items} öğe) + makale ${article.scanned} (${article.failed} erişilemedi) ` +
+    `özet: feed ${feed.ok}/${feed.feeds} (üretken ${feed.productive}, ${feed.items} öğe) + makale ${article.scanned} (${article.failed} erişilemedi) ` +
       `→ ${found.size} link, eklenen ${added} (alıntı ${quoted}), tam metin ${recovered + refreshRecovered}, elenen ${rejected}, tazelenen ${updated}, kapatılan ${closed}, budanan ${deleted}`,
   );
 }

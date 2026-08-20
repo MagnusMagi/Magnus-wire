@@ -207,3 +207,19 @@ $$;
 
 grant execute on function public.tweets_window(int, int, int) to anon, authenticated, service_role;
 notify pgrst, 'reload schema';
+
+-- ── Üretken kaynak şeridi ─────────────────────────────────────────────────
+-- ⚠️ Ölçüm 2026-08-20: beslemelerin ÇOK KÜÇÜK bir azınlığı tweet gömüyor.
+-- 45 Türk kaynağın 42'si tarandı, tweet linki yalnız 4'ünden geldi (Bianet 11,
+-- BirGün 6, webrazzi 3, Milliyet 1). Düz FIFO rotasyonda bu üretken kaynaklar
+-- 774'lük kuyrukta sıraya giriyor ve ~2 saatte bir çekiliyordu; verimsiz 700
+-- kaynak ise her turda bedava slot işgal ediyordu.
+--
+-- Çözüm ingest.mjs'te kanıtlanmış desen: üretken kaynaklar ROTASYONA TABİ
+-- DEĞİL, her koşuda çekilir; kalanlar keşif için FIFO döner. Bu Türkçe'yi de
+-- doğrudan iyileştirir çünkü üretken Türk kaynakları artık her turda taranır.
+alter table public.sources add column if not exists x_found_count integer not null default 0;
+create index if not exists sources_x_productive_idx
+  on public.sources (x_found_count desc) where active and x_found_count > 0;
+
+notify pgrst, 'reload schema';

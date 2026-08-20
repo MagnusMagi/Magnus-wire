@@ -156,6 +156,35 @@ test.describe("X panosu", () => {
     }
   });
 
+  test("onaylı filtresi listeyi daraltıyor ve URL'ye yazılıyor", async ({ page }) => {
+    await page.goto("/tr/x");
+    await expect(page.locator("article").first()).toBeVisible({ timeout: 10000 });
+    const before = await page.locator("article").count();
+
+    await page.getByRole("button", { name: "✓ Onaylı" }).click();
+    await expect(page).toHaveURL(/[?&]onayli=1/);
+
+    const after = await page.locator("article").count();
+    expect(after).toBeGreaterThan(0);
+    expect(after).toBeLessThanOrEqual(before);
+    // Kalan HER kartta doğrulama rozeti olmalı.
+    const withBadge = await page.locator('article:has([aria-label="doğrulanmış"])').count();
+    expect(withBadge).toBe(after);
+  });
+
+  test("onaylı + Türkçe birlikte çalışıyor (Türkiye görünümü)", async ({ page }) => {
+    // Kullanıcının istediği asıl görünüm: Türkiye özelinde onaylı hesaplar.
+    await page.goto("/tr/x?dil=tr&onayli=1");
+    await expect(page.locator("article").first()).toBeVisible({ timeout: 10000 });
+    const n = await page.locator("article").count();
+    expect(n).toBeGreaterThan(0);
+    // Çetele sayacı, tıklandığında görülecek sayıyla TUTARLI olmalı.
+    const rail = page.getByRole("complementary", { name: "Dil" });
+    const active = rail.locator("ul").first().locator("li button[aria-pressed=\"true\"]");
+    const label = await active.innerText();
+    expect(Number(label.match(/(\d+)\s*$/)?.[1])).toBe(n);
+  });
+
   test("navigasyondan X panosuna gidilebiliyor", async ({ page }) => {
     await page.goto("/tr");
     await page.locator('nav a[href="/tr/x"]').first().click();

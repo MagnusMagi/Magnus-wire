@@ -12,6 +12,48 @@ export const runtime = "nodejs";
 // ⚠️ SSRF: `u` parametresi kullanıcıdan gelir. İzin listesi TAM HOST eşleşmesi
 // yapar; "twimg.com ile bitiyor mu" gibi bir kontrol evil-twimg.com'a açık olurdu.
 const ALLOWED_HOSTS = new Set(["pbs.twimg.com", "abs.twimg.com", "video.twimg.com"]);
+
+// Süreç-içi görsel önbelleği.
+//
+// Aynı avatar sayfadaki onlarca kartta ve HER ziyaretçide tekrar tekrar
+// isteniyor; `Cache-Control` yalnız ZATEN gelmiş bir tarayıcıyı kurtarıyor,
+// ilk isteği değil. Önbelleksiz her yeni ziyaretçi X'e ~200 istek attırıyordu
+// ve yoğunlukta X geçici 502 döndürüp kartlarda görsel düşürüyordu (E2E'de
+// paralel koşularda tekrarlanabilir şekilde görüldü).
+//
+// Sınırlı ve basit tutuluyor: ekleme sırası = tahliye sırası (FIFO). LRU'ya
+// gerek yok, avatar kümesi zaten küçük ve yavaş değişiyor.
+const CACHE_MAX_ENTRIES = 400;
+const CACHE_MAX_BYTES = 64 * 1024 * 1024;
+const cache = new Map<string, { buf: ArrayBuffer; type: string }>();
+let cacheBytes = 0;
+
+function cacheGet(key: string) {
+  return cache.get(key);
+}
+
+function cachePut(key: string, buf: ArrayBuffer, type: string) {
+  // Tek bir dev görsel önbelleği kilitlemesin.
+  if (buf.byteLength > CACHE_MAX_BYTES / 8) return;
+  while (cache.size >= CACHE_MAX_ENTRIES || cacheBytes + buf.byteLength > CACHE_MAX_BYTES) {
+    const oldest = cache.keys().next();
+    if (oldest.done) break;
+    const victim = cache.get(oldest.value);
+    if (victim) cacheBytes -= victim.buf.byteLength;
+    cache.delete(oldest.value);
+  }
+  cache.set(key, { buf, type });
+  cacheBytes += buf.byteLength;
+}
+
+const imageHeaders = (type: string, hit: boolean) => ({
+  "Content-Type": type,
+  // Tweet görseli değişmez; uzun önbellek vekilin maliyetini sıfıra yakın tutar.
+  "Cache-Control": "public, max-age=86400, s-maxage=604800, immutable",
+  "Content-Security-Policy": "default-src 'none'; sandbox",
+  "X-Content-Type-Options": "nosniff",
+  "X-Cache": hit ? "HIT" : "MISS",
+});
 const MAX_BYTES = 8 * 1024 * 1024;
 const TIMEOUT_MS = 10_000;
 const MAX_REDIRECTS = 2;
@@ -28,6 +70,11 @@ export async function GET(req: NextRequest) {
   }
   if (target.protocol !== "https:" || !ALLOWED_HOSTS.has(target.hostname)) {
     return new NextResponse("forbidden host", { status: 403 });
+  }
+
+  const cached = cacheGet(target.toString());
+  if (cached) {
+    return new NextResponse(cached.buf, { status: 200, headers: imageHeaders(cached.type, true) });
   }
 
   const ctrl = new AbortController();
@@ -77,19 +124,11 @@ export async function GET(req: NextRequest) {
     const len = Number(upstream.headers.get("content-length") || 0);
     if (len > MAX_BYTES) return new NextResponse("too large", { status: 413 });
 
-    const buf = Buffer.from(await upstream.arrayBuffer());
+    const buf = await upstream.arrayBuffer();
     if (buf.byteLength > MAX_BYTES) return new NextResponse("too large", { status: 413 });
 
-    return new NextResponse(buf, {
-      status: 200,
-      headers: {
-        "Content-Type": type,
-        // Tweet görseli değişmez; uzun önbellek vekilin maliyetini sıfıra yakın tutar.
-        "Cache-Control": "public, max-age=86400, s-maxage=604800, immutable",
-        "Content-Security-Policy": "default-src 'none'; sandbox",
-        "X-Content-Type-Options": "nosniff",
-      },
-    });
+    cachePut(target.toString(), buf, type);
+    return new NextResponse(buf, { status: 200, headers: imageHeaders(type, false) });
   } catch {
     return new NextResponse("fetch failed", { status: 502 });
   } finally {
