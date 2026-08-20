@@ -21,7 +21,7 @@
 import Parser from "rss-parser";
 import { createClient } from "@supabase/supabase-js";
 import { loadEnv, requireEnv } from "./env.mjs";
-import { fetchTweet, fetchTweetRaw, normalizeTweet, quotedTweetOf, extractTweetIds, tweetIdTime } from "../src/lib/xSyndication.mjs";
+import { fetchTweet, fetchTweetRaw, normalizeTweet, quotedTweetOf, extractTweetIds, tweetIdTime, fetchFullText } from "../src/lib/xSyndication.mjs";
 
 loadEnv();
 const [SUPABASE_URL, SERVICE_ROLE] = requireEnv("SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY");
@@ -59,6 +59,13 @@ const GRACE_HOURS = Number(process.env.XI_GRACE_HOURS || 48);
 const KEEP = Number(process.env.XI_KEEP || 3000);
 const KEEP_DAYS = Number(process.env.XI_KEEP_DAYS || 45);
 const CONCURRENCY = Number(process.env.XI_CONCURRENCY || 4);
+// Uzun gönderi kurtarma bütçesi. Topluluk servisine karşı nazik olmak için
+// koşu başına sınırlı; sonuç DB'ye yazıldığı için tweet başına tek istek
+// yeterli, bekleyenler sonraki koşularda sıraya girer.
+const FULLTEXT_PER_RUN = Number(process.env.XI_FULLTEXT_PER_RUN || 15);
+// Koşu başına paylaşılan kurtarma bütçesi: hem yeni teller hem de tazeleme
+// rotasyonunda bekleyen eski kesikler aynı kasadan harcar.
+let fullBudget = FULLTEXT_PER_RUN;
 const ARTICLE_TIMEOUT_MS = Number(process.env.XI_ARTICLE_TIMEOUT_MS || 12000);
 
 const UA_BROWSER =
@@ -209,7 +216,7 @@ async function discover() {
 }
 
 async function resolveNew(found) {
-  if (!found.size) return { added: 0, quoted: 0, rejected: 0 };
+  if (!found.size) return { added: 0, quoted: 0, rejected: 0, recovered: 0 };
   const ids = [...found.keys()];
 
   // İki elek: (1) havuzda olanlar — aynı tweet onlarca haberde alıntılanıyor,
@@ -233,11 +240,12 @@ async function resolveNew(found) {
     // tweet'lerine gitmeli, kuyruğun rastgele bir yerine değil.
     .sort((a, b) => tweetIdTime(b) - tweetIdTime(a))
     .slice(0, RESOLVE_PER_RUN);
-  if (!fresh.length) return { added: 0, quoted: 0, rejected: 0 };
+  if (!fresh.length) return { added: 0, quoted: 0, rejected: 0, recovered: 0 };
 
   const rows = [];
   const rejects = [];
   let quoted = 0;
+  let recovered = 0;
   const now = new Date().toISOString();
   const tooOld = (iso) => Date.now() - Date.parse(iso) > KEEP_DAYS * 86400000;
 
@@ -263,6 +271,18 @@ async function resolveNew(found) {
       rejects.push({ id, reason: "metinsiz" });
       return;
     }
+    // Kesilmiş uzun gönderiyi kurtarmayı dene. Başarısızlık ZARARSIZ:
+    // `truncated` true kalır ve kart "X'te tamamını oku" bağlantısı gösterir.
+    if (t.truncated && fullBudget > 0) {
+      fullBudget--;
+      const full = await fetchFullText(id);
+      if (full && full.length > t.text.length) {
+        t.text = full;
+        t.truncated = false;
+        recovered++;
+      }
+    }
+
     const src = found.get(id) ?? {};
     rows.push({
       ...t,
@@ -292,7 +312,7 @@ async function resolveNew(found) {
     const { error } = await sb.from("tweet_rejects").upsert(rejects, { onConflict: "id" });
     if (error) log("sicil hatası:", error.message);
   }
-  if (!rows.length) return { added: 0, quoted: 0, rejected: rejects.length };
+  if (!rows.length) return { added: 0, quoted: 0, rejected: rejects.length, recovered };
 
   // Aynı koşuda hem doğrudan hem alıntı olarak gelen ID tekrarlanabilir;
   // upsert'e çift anahtar vermek PostgREST'te hata döndürür.
@@ -300,9 +320,9 @@ async function resolveNew(found) {
   const { error } = await sb.from("tweets").upsert(uniq, { onConflict: "id" });
   if (error) {
     log("ekleme hatası:", error.message);
-    return { added: 0, quoted: 0, rejected: rejects.length };
+    return { added: 0, quoted: 0, rejected: rejects.length, recovered };
   }
-  return { added: uniq.length, quoted, rejected: rejects.length };
+  return { added: uniq.length, quoted, rejected: rejects.length, recovered };
 }
 
 async function refresh() {
@@ -316,19 +336,20 @@ async function refresh() {
   const coldSince = new Date(Date.now() - REFRESH_MAX_AGE_DAYS * 86400000).toISOString();
 
   const [hot, cold] = await Promise.all([
-    sb.from("tweets").select("id,fail_count").eq("active", true)
+    sb.from("tweets").select("id,fail_count,text,truncated").eq("active", true)
       .gte("posted_at", hotSince)
       .order("refreshed_at", { ascending: true, nullsFirst: true }).limit(hotBudget),
-    sb.from("tweets").select("id,fail_count").eq("active", true)
+    sb.from("tweets").select("id,fail_count,text,truncated").eq("active", true)
       .gte("posted_at", coldSince).lt("posted_at", hotSince)
       .order("refreshed_at", { ascending: true, nullsFirst: true }).limit(coldBudget),
   ]);
 
   const list = [...(hot.data ?? []), ...(cold.data ?? [])];
-  if (!list.length) return { updated: 0, closed: 0 };
+  if (!list.length) return { updated: 0, closed: 0, refreshRecovered: 0 };
 
   let updated = 0;
   let closed = 0;
+  let refreshRecovered = 0;
   const now = new Date().toISOString();
   await pool(list, CONCURRENCY, async (row) => {
     const t = await fetchTweet(row.id);
@@ -344,10 +365,26 @@ async function refresh() {
       await sb.from("tweets").update(patch).eq("id", row.id);
       return;
     }
+    // ⚠️ KURTARILMIŞ TAM METNİN ÜZERİNE YAZMA. Tazeleme syndication'dan
+    // okuyor ve orası uzun gönderiyi hep kesik döndürüyor; körü körüne
+    // yazsaydık her tazeleme turu kurtardığımız metni geri kısaltırdı.
+    // Rotasyon zaten havuzu dolaştığı için geri doldurma AYRI bir geçiş
+    // gerektirmiyor: sırası gelen kesik tel burada kurtarılmayı dener.
+    if (t.truncated && fullBudget > 0) {
+      fullBudget--;
+      const full = await fetchFullText(row.id);
+      if (full && full.length > t.text.length) {
+        t.text = full;
+        t.truncated = false;
+        refreshRecovered++;
+      }
+    }
+    const keepLonger = t.truncated && row.text && row.text.length > t.text.length;
     await sb.from("tweets").update({
       favorite_count: t.favorite_count,
       reply_count: t.reply_count,
-      text: t.text,
+      text: keepLonger ? row.text : t.text,
+      truncated: keepLonger ? Boolean(row.truncated) : t.truncated,
       author_name: t.author_name,
       avatar_url: t.avatar_url,
       verified: t.verified,
@@ -358,7 +395,7 @@ async function refresh() {
     }).eq("id", row.id);
     updated++;
   });
-  return { updated, closed };
+  return { updated, closed, refreshRecovered };
 }
 
 async function prune() {
@@ -426,8 +463,8 @@ async function main() {
   const found = new Map(feed.found);
   for (const [id, src] of article.found) found.set(id, src); // makale izi daha zengin (dispatch slug'ı var)
 
-  const { added, quoted, rejected } = await resolveNew(found);
-  const { updated, closed } = await refresh();
+  const { added, quoted, rejected, recovered } = await resolveNew(found);
+  const { updated, closed, refreshRecovered } = await refresh();
   const deleted = await prune();
 
   if (process.env.REVALIDATE_SECRET) {
@@ -445,7 +482,7 @@ async function main() {
   // Tek satırlık özet — "neden az tweet geldi?" sorusu log'dan cevaplanabilsin.
   log(
     `özet: feed ${feed.ok}/${feed.feeds} (${feed.items} öğe) + makale ${article.scanned} (${article.failed} erişilemedi) ` +
-      `→ ${found.size} link, eklenen ${added} (alıntı ${quoted}), elenen ${rejected}, tazelenen ${updated}, kapatılan ${closed}, budanan ${deleted}`,
+      `→ ${found.size} link, eklenen ${added} (alıntı ${quoted}), tam metin ${recovered + refreshRecovered}, elenen ${rejected}, tazelenen ${updated}, kapatılan ${closed}, budanan ${deleted}`,
   );
 }
 

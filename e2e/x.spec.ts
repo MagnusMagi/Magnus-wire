@@ -130,6 +130,32 @@ test.describe("X panosu", () => {
     }
   });
 
+  test("uzun gönderilerin TAM metni gösteriliyor", async ({ page }) => {
+    // ⚠️ X'in kendi ücretsiz uçları 280 karakterde kesiyor; tam metin ancak
+    // kurtarma hattıyla geliyor (bkz xSyndication.mjs:fetchFullText). 320+
+    // karakterlik bir kart, kurtarmanın canlı olduğunun kanıtı.
+    await page.goto("/tr/x");
+    await expect(page.locator("article").first()).toBeVisible({ timeout: 10000 });
+    const longest = await page.locator("article p.whitespace-pre-wrap").evaluateAll(
+      (ps) => Math.max(0, ...ps.map((p) => (p.textContent || "").trim().length)),
+    );
+    expect(longest).toBeGreaterThan(320);
+  });
+
+  test("kurtarılamayan gönderi sessizce kesilmiyor", async ({ page }) => {
+    // Kurtarma başarısız olabilir (silinmiş/erişilemez). O zaman kart bunu
+    // AÇIKÇA söylemeli. Sayfada kesik tel yoksa test boşuna geçmesin diye
+    // iddia koşullu: VARSA bağlantısı doğru olmalı.
+    await page.goto("/tr/x");
+    await expect(page.locator("article").first()).toBeVisible({ timeout: 10000 });
+    const notice = page.locator('a:has-text("X bu gönderiyi kısaltıyor")');
+    const n = await notice.count();
+    for (let i = 0; i < n; i++) {
+      const href = await notice.nth(i).getAttribute("href");
+      expect(href).toMatch(/^https:\/\/x\.com\/[^/]+\/status\/\d+$/);
+    }
+  });
+
   test("navigasyondan X panosuna gidilebiliyor", async ({ page }) => {
     await page.goto("/tr");
     await page.locator('nav a[href="/tr/x"]').first().click();

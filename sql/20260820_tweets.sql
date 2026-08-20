@@ -122,7 +122,10 @@ notify pgrst, 'reload schema';
 -- Tek sorguda iki küme birleşir:
 --   • genel tazelik  → en yeni p_recent tel (sayfanın "gündem" hissi)
 --   • dil tabanı     → her dilden en yeni p_per_lang tel (filtre hep dolu)
-create or replace function public.tweets_window(
+-- ⚠️ Dönüş tipi değiştiği için önce DROP şart (Postgres "cannot change return
+-- type of existing function" der; kolon eklerken bu tuzağa iki kez düşülür).
+drop function if exists public.tweets_window(int, int, int);
+create function public.tweets_window(
   p_days     int default 30,
   p_recent   int default 200,
   p_per_lang int default 30
@@ -158,4 +161,49 @@ $$;
 -- (tweets_public_read politikası), fonksiyon ek yetki AÇMAZ.
 grant execute on function public.tweets_window(int, int, int) to anon, authenticated, service_role;
 
+notify pgrst, 'reload schema';
+
+-- ── Uzun gönderi işareti ──────────────────────────────────────────────────
+-- ⚠️ X'in ÜCRETSİZ uçlarının hiçbiri uzun gönderilerin (280+ karakter) tam
+-- metnini vermiyor — ne syndication ne oEmbed; resmî gömme widget'ı bile
+-- "Show more" ile kesiyor. Ölçüm 2026-08-20: 240+ karakterli tellerin %78'i
+-- böyle, yani havuzun ~%39'u.
+--
+-- Yanıtta `note_tweet` alanı VAR ama içinde yalnız bir kimlik var, metin yok.
+-- Bu alanın varlığı "bu tel kesildi"nin GÜVENİLİR işareti; kart o zaman
+-- kesildiğini açıkça söyleyip özgün gönderiye yolluyor. Sessizce cümlenin
+-- ortasında bitmek hata gibi okunuyordu.
+alter table public.tweets add column if not exists truncated boolean not null default false;
+
+-- ⚠️ Dönüş tipi değiştiği için önce DROP şart (Postgres "cannot change return
+-- type of existing function" der; kolon eklerken bu tuzağa iki kez düşülür).
+drop function if exists public.tweets_window(int, int, int);
+create function public.tweets_window(
+  p_days int default 30, p_recent int default 200, p_per_lang int default 30
+)
+returns table (
+  id text, screen_name text, author_name text, avatar_url text, verified boolean,
+  text text, lang text, favorite_count int, reply_count int, photos jsonb,
+  posted_at timestamptz, source_name text, source_dispatch_slug text,
+  section text, pinned boolean, truncated boolean
+)
+language sql stable as $$
+  with base as (
+    select t.*,
+           row_number() over (partition by t.lang order by t.posted_at desc) as rn_lang,
+           row_number() over (order by t.posted_at desc)                     as rn_all
+    from public.tweets t
+    where t.active and t.lang <> 'und'
+      and t.posted_at >= now() - make_interval(days => p_days)
+  )
+  select b.id, b.screen_name, b.author_name, b.avatar_url, b.verified,
+         b.text, b.lang, b.favorite_count, b.reply_count, b.photos,
+         b.posted_at, b.source_name, b.source_dispatch_slug, b.section,
+         b.pinned, b.truncated
+  from base b
+  where b.rn_all <= p_recent or b.rn_lang <= p_per_lang
+  order by b.posted_at desc
+$$;
+
+grant execute on function public.tweets_window(int, int, int) to anon, authenticated, service_role;
 notify pgrst, 'reload schema';

@@ -42,7 +42,7 @@ const STRINGS: Record<Locale, Dict> = {
     xEmpty: "Havuz henüz boş — tarayıcı ilk tweet'leri bekliyor.",
     xEmptyLang: "Bu dilde tweet yok.",
     xOpen: "X'te aç", xOpenOnX: "Tweet'i X'te aç", xQuotedIn: "şurada alıntılandı:",
-    xLikes: "beğeni", xReplies: "yanıt", xNew: "yeni tel", xOpenPhoto: "Görseli büyüt", close: "Kapat",
+    xLikes: "beğeni", xReplies: "yanıt", xNew: "yeni tel", xOpenPhoto: "Görseli büyüt", xTruncated: "X bu gönderiyi kısaltıyor — tamamını oku", close: "Kapat",
     xDisclaimer: "Tweet'ler X'in açık gömme verisinden alınır ve yazarlarına aittir; MagiWire'ın görüşünü yansıtmaz. Sıralama etkileşim ve tazelik ile hesaplanır. Sayfa hiçbir ücretli X API'si kullanmaz ve tarayıcınızdan X'e istek yapmaz.",
   },
   en: {
@@ -76,7 +76,7 @@ const STRINGS: Record<Locale, Dict> = {
     xEmpty: "The pool is still empty — the scanner is waiting for its first tweets.",
     xEmptyLang: "No tweets in this language.",
     xOpen: "Open on X", xOpenOnX: "Open this post on X", xQuotedIn: "quoted in",
-    xLikes: "likes", xReplies: "replies", xNew: "new posts", xOpenPhoto: "Enlarge photo", close: "Close",
+    xLikes: "likes", xReplies: "replies", xNew: "new posts", xOpenPhoto: "Enlarge photo", xTruncated: "X shortens this post — read it in full", close: "Close",
     xDisclaimer: "Posts come from X's public embed data and belong to their authors; they do not reflect MagiWire's views. Ranking combines engagement and freshness. This page uses no paid X API and makes no requests from your browser to X.",
   },
   et: {
@@ -110,7 +110,7 @@ const STRINGS: Record<Locale, Dict> = {
     xEmpty: "Kogum on veel tühi — skanner ootab esimesi säutse.",
     xEmptyLang: "Selles keeles säutse pole.",
     xOpen: "Ava X-is", xOpenOnX: "Ava postitus X-is", xQuotedIn: "tsiteeritud:",
-    xLikes: "meeldimist", xReplies: "vastust", xNew: "uut postitust", xOpenPhoto: "Suurenda pilti", close: "Sulge",
+    xLikes: "meeldimist", xReplies: "vastust", xNew: "uut postitust", xOpenPhoto: "Suurenda pilti", xTruncated: "X lühendab seda postitust — loe täismahus", close: "Sulge",
     xDisclaimer: "Postitused pärinevad X-i avalikest manustamisandmetest ja kuuluvad nende autoritele; need ei väljenda MagiWire'i seisukohti. Järjestus arvestab kaasatust ja värskust. Leht ei kasuta ühtegi tasulist X API-t ega tee teie brauserist päringuid X-i.",
   },
 };

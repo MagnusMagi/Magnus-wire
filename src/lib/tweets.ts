@@ -26,6 +26,8 @@ export interface Tweet {
   dispatchSlug: string | null;
   section: string | null;
   pinned: boolean;
+  /** X uzun gönderiyi kesti; tam metin ücretsiz uçlarda YOK (bkz xSyndication.mjs). */
+  truncated: boolean;
 }
 
 // Sayfanın çektiği pencere. ⚠️ Skor SAKLANMIYOR (bkz sql/20260820_tweets.sql):
@@ -53,6 +55,7 @@ interface Row {
   source_dispatch_slug: string | null;
   section: string | null;
   pinned: boolean;
+  truncated: boolean;
 }
 
 function toTweet(r: Row): Tweet {
@@ -72,6 +75,7 @@ function toTweet(r: Row): Tweet {
     dispatchSlug: r.source_dispatch_slug,
     section: r.section,
     pinned: r.pinned,
+    truncated: Boolean(r.truncated),
   };
 }
 

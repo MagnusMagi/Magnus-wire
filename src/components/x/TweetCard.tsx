@@ -111,10 +111,27 @@ export function TweetCard({
             </span>
           </div>
 
-          {/* Gövde */}
+          {/* Gövde. ⚠️ Uzun gönderilerde X'in kendisi metni ~280 karakterde
+              kesiyor ve tam metni HİÇBİR ücretsiz uçtan vermiyor (syndication
+              da oEmbed de aynı yerde bitiyor, resmî widget bile "Show more"
+              gösteriyor). Sessizce cümlenin ortasında bitmek hata gibi
+              okunuyordu; kesilme artık açıkça söylenip özgün gönderiye
+              yönlendiriliyor. */}
           <p className="mt-2 text-[15px] leading-[1.5] text-ink whitespace-pre-wrap break-words">
             {tweet.text || <span className="text-ink-3 italic">—</span>}
+            {tweet.truncated && <span aria-hidden className="text-ink-3">…</span>}
           </p>
+          {tweet.truncated && (
+            <a
+              href={url}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="mt-1.5 inline-flex items-center gap-1.5 font-mono text-[11px] text-wire hover:text-signal border-b border-dotted border-line hover:border-signal transition-colors"
+            >
+              <XMark className="w-3 h-3 flex-none" />
+              {t(locale, "xTruncated")} →
+            </a>
+          )}
 
           {/* Medya — tıklanınca tam ekran açılır (TweetPhotos istemci parçası) */}
           <TweetPhotos photos={tweet.photos} locale={locale} alt={`${tweet.authorName} — görsel`} />

@@ -72,7 +72,7 @@ const decode = (s) => s.replace(/&(?:amp|lt|gt|quot|#39|nbsp);/g, (m) => ENTITIE
  *   avatar_url: string|null, verified: boolean, text: string, lang: string,
  *   favorite_count: number, reply_count: number,
  *   photos: {url: string, w: number|null, h: number|null}[],
- *   posted_at: string|null
+ *   posted_at: string|null, truncated: boolean
  * }} TweetRow
  */
 
@@ -121,6 +121,12 @@ export function normalizeTweet(raw) {
     reply_count: Number(raw.conversation_count) || 0,
     photos: photos.slice(0, 2),
     posted_at: raw.created_at ?? null,
+    // ⚠️ Uzun gönderi (280+ karakter) işareti. X'in ücretsiz uçlarının HİÇBİRİ
+    // tam metni vermiyor — ne syndication ne oEmbed, resmî gömme widget'ı bile
+    // "Show more" ile kesiyor. `note_tweet` alanı yanıtta VAR ama içinde yalnız
+    // bir kimlik var, metin yok. Varlığı "bu tel kesildi"nin güvenilir işareti;
+    // kart bunu açıkça söyleyip özgün gönderiye yollasın diye saklanıyor.
+    truncated: Boolean(raw.note_tweet),
   };
 }
 
@@ -172,6 +178,53 @@ export async function fetchTweetRaw(id, opts = {}) {
  */
 export function quotedTweetOf(raw) {
   return normalizeTweet(raw?.quoted_tweet ?? null);
+}
+
+// ── Uzun gönderi kurtarma ─────────────────────────────────────────────────
+// ⚠️ X'in KENDİ ücretsiz uçlarının hiçbiri 280+ karakterli gönderilerin tam
+// metnini vermiyor (syndication `note_tweet` alanında yalnız bir kimlik
+// döndürüyor; oEmbed aynı yerde "…" ile kesiyor; resmî gömme widget'ı bile
+// "Show more" gösteriyor). Ölçüm 2026-08-20: havuzun ~%35'i böyle.
+//
+// Bu yüzden YALNIZ kesilmiş teller için, ücretsiz ve anahtarsız topluluk
+// servisleri yedek olarak kullanılıyor (FixTweet ailesi). Kayıt/ücret yok.
+// Tasarım kuralları:
+//   • Sadece `truncated` işaretli tweet'e çağrılır (havuzun küçük bir kısmı).
+//   • Sonuç DB'ye yazılır → tweet başına ÖMÜR BOYU tek istek.
+//   • Düşerse SESSİZCE bugünkü davranışa döner (kısa metin + "X'te oku").
+//   • Yalnız SUNUCUDAN çağrılır; ziyaretçinin tarayıcısı bu servisleri görmez.
+const FULLTEXT_SOURCES = [
+  { url: (id) => `https://api.fxtwitter.com/status/${id}`, pick: (j) => j?.tweet?.text },
+  { url: (id) => `https://api.vxtwitter.com/Twitter/status/${id}`, pick: (j) => j?.text },
+];
+
+/**
+ * Kesilmiş bir gönderinin TAM metnini kurtarmaya çalışır.
+ * @param {string} id
+ * @param {{timeoutMs?: number}} [opts]
+ * @returns {Promise<string|null>} kurtarılamazsa null
+ */
+export async function fetchFullText(id, opts = {}) {
+  if (!/^\d{10,25}$/.test(String(id))) return null;
+  for (const src of FULLTEXT_SOURCES) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? 10000);
+    try {
+      const res = await fetch(src.url(id), {
+        signal: ctrl.signal,
+        headers: { "User-Agent": UA, Accept: "application/json" },
+        cache: "no-store",
+      });
+      if (!res.ok) continue;
+      const text = src.pick(await res.json());
+      if (typeof text === "string" && text.trim()) return decode(text).trim();
+    } catch {
+      // sıradaki kaynağı dene
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  return null;
 }
 
 /**

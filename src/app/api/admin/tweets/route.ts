@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { ADMIN_COOKIE, verifySessionToken } from "@/lib/adminAuth";
 import { supabaseAdmin } from "@/lib/supabase";
-import { fetchTweet, tweetIdFromUrl } from "@/lib/xSyndication.mjs";
+import { fetchTweet, fetchFullText, tweetIdFromUrl } from "@/lib/xSyndication.mjs";
 
 export const runtime = "nodejs";
 
@@ -39,6 +39,16 @@ export async function POST(req: NextRequest) {
   // "gösterilemez" diye bildiriyoruz, admin tekrar deneyebilir.
   if (!tw || !tw.posted_at) {
     return NextResponse.json({ error: "tweet çekilemedi (silinmiş, gizli veya geçici hata)" }, { status: 502 });
+  }
+
+  // Uzun gönderiyse tam metni kurtarmayı dene; başarısızlık zararsız, kart
+  // "X'te tamamını oku" bağlantısı gösterir (bkz xSyndication.mjs).
+  if (tw.truncated) {
+    const full = await fetchFullText(id);
+    if (full && full.length > tw.text.length) {
+      tw.text = full;
+      tw.truncated = false;
+    }
   }
 
   const sb = supabaseAdmin();
