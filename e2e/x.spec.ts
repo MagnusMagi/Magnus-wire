@@ -185,6 +185,67 @@ test.describe("X panosu", () => {
     expect(Number(label.match(/(\d+)\s*$/)?.[1])).toBe(n);
   });
 
+  test("dil çetelesinde odak halkası sütunu taşmıyor ve görünür kalıyor", async ({ page }) => {
+    // ⚠️ Gerileme testi. Global kural `outline: 2px solid; outline-offset: 2px`
+    // halkayı DIŞARI çiziyor; çetele butonu sütunun tam genişliği olduğu için
+    // halka sağa/sola 4'er px taşıyor ve başlığın alt çizgisiyle hizasız
+    // görünüyordu. Ayrıca bu kural KATMANSIZ olduğu sürece hiçbir utility onu
+    // ezemiyordu (Tailwind v4: katmansız CSS katmanlı utility'yi yener).
+    await page.goto("/tr/x");
+    const rail = page.getByRole("complementary", { name: "Dil" });
+    await expect(page.locator("article").first()).toBeVisible({ timeout: 10000 });
+
+    const r = await rail.locator("ul").first().locator("li button").first().evaluate((btn) => {
+      btn.focus();
+      const cs = getComputedStyle(btn);
+      const ow = parseFloat(cs.outlineWidth) || 0;
+      const off = parseFloat(cs.outlineOffset) || 0;
+      const bb = btn.getBoundingClientRect();
+      const ab = (btn.closest("aside") as HTMLElement).getBoundingClientRect();
+      return {
+        style: cs.outlineStyle,
+        width: ow,
+        left: +(ab.left - (bb.left - (ow + off))).toFixed(1),
+        right: +((bb.right + (ow + off)) - ab.right).toFixed(1),
+      };
+    });
+
+    // Görünür OLMALI (WCAG 2.4.7) …
+    expect(r.style).not.toBe("none");
+    expect(r.width).toBeGreaterThan(0);
+    // … ama sütunun dışına TAŞMAMALI.
+    expect(r.left).toBeLessThanOrEqual(0);
+    expect(r.right).toBeLessThanOrEqual(0);
+  });
+
+  test("mobil dil şeridi odak halkasını kırpmıyor", async ({ page }) => {
+    // ⚠️ `overflow-x:auto` diğer ekseni de `auto` yapar ve halkayı kırpar →
+    // mobilde klavye odağı kısmen görünmez kalıyordu.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/tr/x");
+    await expect(page.locator("article").first()).toBeVisible({ timeout: 10000 });
+
+    const clipped = await page
+      .getByRole("complementary", { name: "Dil" })
+      .locator("ul")
+      .last()
+      .evaluate((ul) => {
+        const btn = ul.querySelector("li button") as HTMLElement;
+        btn.focus();
+        const cs = getComputedStyle(btn);
+        const pad = (parseFloat(cs.outlineWidth) || 0) + (parseFloat(cs.outlineOffset) || 0);
+        const bb = btn.getBoundingClientRect();
+        const ub = ul.getBoundingClientRect();
+        return (
+          bb.left - pad < ub.left - 0.2 ||
+          bb.right + pad > ub.right + 0.2 ||
+          bb.top - pad < ub.top - 0.2 ||
+          bb.bottom + pad > ub.bottom + 0.2
+        );
+      });
+    expect(clipped).toBe(false);
+  });
+
   test("navigasyondan X panosuna gidilebiliyor", async ({ page }) => {
     await page.goto("/tr");
     await page.locator('nav a[href="/tr/x"]').first().click();

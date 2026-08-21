@@ -142,7 +142,12 @@ export function XBoard({ tweets: initial, locale }: { tweets: Tweet[]; locale: L
           type="button"
           onClick={() => setLang(code)}
           aria-pressed={on}
-          className={`w-full text-left px-2 py-1.5 border-l-2 transition-colors ${
+          // ⚠️ Odak halkası İÇERİ çiziliyor (negatif offset). Global kural
+          // `outline: 2px solid; outline-offset: 2px` halkayı DIŞARI koyuyor;
+          // bu buton sütunun tam genişliği (212px) olduğu için halka sağa ve
+          // sola 4'er px taşıyor, "DİL" başlığının 212px'lik alt çizgisiyle
+          // hizasız görünüyordu. Tam-genişlik butonlarda halka içeride durmalı.
+          className={`w-full text-left px-2 py-1.5 border-l-2 transition-colors focus-visible:[outline-offset:-2px] ${
             on ? "border-signal bg-panel" : "border-transparent hover:bg-panel/60"
           }`}
         >
@@ -180,8 +185,12 @@ export function XBoard({ tweets: initial, locale }: { tweets: Tweet[]; locale: L
           {langRow(ALL, t(locale, "filterAll"), scoped.length, 1)}
           {counts.map((c) => langRow(c.code, langName(c.code, locale), c.count, c.count / maxCount))}
         </ul>
-        {/* Mobil: aynı veri, yatay çip şeridi */}
-        <ul className="lg:hidden flex gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden m-0 p-0 pt-2 list-none">
+        {/* Mobil: aynı veri, yatay çip şeridi.
+            ⚠️ `overflow-x:auto` diğer ekseni de `auto` yapıyor ve odak halkasını
+            KIRPIYOR (ölçüldü: overflow `auto/auto`) — yani mobilde klavye odağı
+            kısmen görünmez oluyordu (WCAG 2.4.7). Kaba içeriden pay verilip
+            negatif kenar boşluğuyla hiza korunuyor: halka payın içinde kalır. */}
+        <ul className="lg:hidden flex gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden m-0 list-none p-1 -mx-1 mt-1">
           {[{ code: ALL, count: scoped.length }, ...counts].map((c) => (
             <li key={c.code} className="flex-none">
               <button type="button" onClick={() => setLang(c.code)} aria-pressed={lang === c.code} className={tabCls(lang === c.code)}>
@@ -198,7 +207,8 @@ export function XBoard({ tweets: initial, locale }: { tweets: Tweet[]; locale: L
           <button
             type="button"
             onClick={applyPending}
-            className="w-full mb-3 py-2 border border-signal text-signal font-mono text-[11px] font-bold uppercase tracking-wider hover:bg-signal hover:text-paper transition-colors"
+            // Tam genişlik buton → odak halkası içeride (çetele satırıyla aynı gerekçe).
+            className="w-full mb-3 py-2 border border-signal text-signal font-mono text-[11px] font-bold uppercase tracking-wider hover:bg-signal hover:text-paper transition-colors focus-visible:[outline-offset:-2px]"
           >
             ↑ {pendingCount} {t(locale, "xNew")}
           </button>

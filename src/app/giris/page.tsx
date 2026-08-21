@@ -55,7 +55,12 @@ function GirisForm() {
         autoFocus
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        className="w-full border border-line bg-paper px-3 py-2 text-sm mb-3 outline-none focus:border-wire"
+        // ⚠️ `outline-none` KALDIRILDI. Global odak halkası (:focus-visible) artık
+        // @layer base içinde olduğu için utility'ler onu EZEBİLİYOR; bu satır
+        // duruyorken klavye odağı bu alanda tamamen görünmez oluyordu (ölçüldü:
+        // odaklı/odaksız piksel farkı sıfır). Tek başına kenarlık rengi değişimi
+        // WCAG 2.4.7 için yeterli bir gösterge değil.
+        className="w-full border border-line bg-paper px-3 py-2 text-sm mb-3 focus:border-wire"
       />
       {error && <div className="text-signal text-xs mb-3">{error}</div>}
       <button

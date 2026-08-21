@@ -53,8 +53,18 @@ body {
 }
 ::selection { background: var(--color-signal); color: #fff; }
 /* WCAG 2.4.7 (AA): odak göstergesi görünür OLMALI. Daha önce outline:none
-   yapılmıştı; klavyeyle gezen kullanıcı nerede olduğunu göremiyordu. */
-:focus-visible { outline: 2px solid var(--color-wire); outline-offset: 2px; }
+   yapılmıştı; klavyeyle gezen kullanıcı nerede olduğunu göremiyordu.
+
+   ⚠️ @layer base ŞART — yukarıdaki <a> ve <img> kurallarıyla AYNI tuzak:
+   Tailwind v4'te KATMANSIZ CSS, KATMANLI utility'leri YENER. Bu satır
+   katmansızken `focus-visible:[outline-offset:-2px]` gibi bir utility hiçbir
+   etki etmiyordu. Somut sonuç: X panosundaki dil çetelesi butonu sütunun tam
+   genişliğinde (212px) olduğu için odak halkası sağa ve sola 4'er px taşıyor,
+   başlığın alt çizgisiyle hizasız görünüyordu ve düzeltilemiyordu.
+   Katmana alınınca varsayılan korunur ama gerektiğinde ezilebilir hale gelir. */
+@layer base {
+  :focus-visible { outline: 2px solid var(--color-wire); outline-offset: 2px; }
+}
 
 /* ============================================================
    İmza yardımcıları + hareket
