@@ -38,6 +38,11 @@ const WINDOW_LIMIT = 200;
 // Her dilin en az bu kadar teli pencereye girer — nadir diller genel tazelik
 // yarışında ezilmesin diye taban kota.
 const PER_LANG_FLOOR = 30;
+// Sayfada gösterilen diller. Havuza da yalnız bunlar yazılıyor
+// (scripts/ingest-tweets.mjs:LANGS); buradaki liste ikinci emniyet.
+// ⚠️ Tek dil kaldığında dil çetelesi kendini gizler (XBoard) — tek öğelik
+// bir filtre kullanıcıya seçenek değil gürültü sunar.
+const SHOWN_LANGS = ["tr"];
 
 interface Row {
   id: string;
@@ -127,7 +132,7 @@ export async function getTweets(): Promise<Tweet[]> {
     console.error("[tweets] pencere okuma hatası:", error.message);
     return [];
   }
-  return ((data ?? []) as Row[]).map(toTweet);
+  return ((data ?? []) as Row[]).map(toTweet).filter((t) => SHOWN_LANGS.includes(t.lang));
 }
 
 // ── Dil etiketleri ────────────────────────────────────────────────────────

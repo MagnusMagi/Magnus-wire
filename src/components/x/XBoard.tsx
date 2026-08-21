@@ -124,6 +124,11 @@ export function XBoard({ tweets: initial, locale }: { tweets: Tweet[]; locale: L
   const peak = useMemo(() => Math.max(1, ...list.map((x) => x.likes + 3 * x.replies)), [list]);
   const maxCount = Math.max(1, ...counts.map((c) => c.count));
 
+  // ⚠️ Tek dil varsa çetele GİZLENİR: "Tümü / Türkçe" diye iki satırlık bir
+  // filtre kullanıcıya seçenek değil gürültü sunar ve sütun genişliğini boşuna
+  // yer. Kod genel kalıyor — ikinci dil geri açılırsa ray kendiliğinden döner.
+  const showRail = counts.length > 1;
+
   const tabCls = (on: boolean) =>
     `font-mono text-[10px] font-bold uppercase tracking-wider px-2 py-1 border transition-colors ${
       on ? "border-signal text-signal" : "border-line text-ink-3 hover:border-ink hover:text-ink"
@@ -173,10 +178,11 @@ export function XBoard({ tweets: initial, locale }: { tweets: Tweet[]; locale: L
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[212px_minmax(0,1fr)] gap-6 lg:gap-9">
+    <div className={`grid grid-cols-1 gap-6 lg:gap-9 ${showRail ? "lg:grid-cols-[212px_minmax(0,1fr)]" : ""}`}>
       {/* Dil çetelesi. Masaüstünde yapışkan sütun, mobilde yatay şerit. */}
       {/* aria-label: sayfada birden çok aside var (yan ray da öyle); ekran
           okuyucu ve testler için bu bölgenin ne olduğu adlandırılıyor. */}
+      {showRail && (
       <aside aria-label={t(locale, "xLangFilter")} className="lg:sticky lg:top-[104px] self-start min-w-0">
         <h2 className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-wire border-b border-line pb-1.5 mb-1">
           {t(locale, "xLangFilter")}
@@ -200,6 +206,7 @@ export function XBoard({ tweets: initial, locale }: { tweets: Tweet[]; locale: L
           ))}
         </ul>
       </aside>
+      )}
 
       <div className="min-w-0">
         {/* Yeni tel bildirimi: listeyi kullanıcının altından çekmeden haber verir. */}
@@ -220,7 +227,7 @@ export function XBoard({ tweets: initial, locale }: { tweets: Tweet[]; locale: L
               <span aria-hidden className="inline-block w-1.5 h-1.5 rounded-full bg-signal wire-pulse" title={t(locale, "live")} />
             )}
             {list.length} {t(locale, "xCount")}
-            {lang !== ALL && <span className="text-ink-2"> · {langName(lang, locale)}</span>}
+            {showRail && lang !== ALL && <span className="text-ink-2"> · {langName(lang, locale)}</span>}
           </span>
           <div className="flex gap-1.5">
             <button

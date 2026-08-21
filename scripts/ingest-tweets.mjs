@@ -55,6 +55,27 @@ const SCAN_PER_RUN = Number(process.env.XI_SCAN_PER_RUN || 12);
 // Taranan makalenin yaş sınırı: eski makaleyi çekmek keşif getirisi düşük.
 const SCAN_MAX_AGE_DAYS = Number(process.env.XI_SCAN_MAX_AGE_DAYS || 7);
 const RESOLVE_PER_RUN = Number(process.env.XI_RESOLVE_PER_RUN || 40);
+// ⚠️ Bağımsız X kaynak hattına AYRILMIŞ pay. Ölçüm 2026-08-21: koşu başına
+// 2.800+ aday link bulunuyor ve 40'lık bütçe her turda doluyor. Seçim "en
+// tazeden eskiye" olduğu için Türkiye hattı SİSTEMATİK olarak eleniyordu:
+// doğrulama/analiz yazıları günler öncesinin viral tweet'ini alıntılıyor,
+// genel hat ise dakikalık taze link üretiyor → Türk teli hiç sıraya giremiyor.
+// Aynı açlık deseni daha önce iki kez görüldü (gundem'in vitrini kaplaması,
+// İngilizce'nin dil penceresini doldurması); çare yine aynı: AYRILMIŞ KOTA.
+// Kullanılmayan pay genel havuza geri döner, israf olmaz.
+const RESOLVE_XSRC_RESERVED = Number(process.env.XI_RESOLVE_XSRC || 15);
+// ⚠️ Türkçe dışı kaynaklardan gelen adaylara ayrılan KEŞİF payı. Pano yalnız
+// Türkçe gösterdiği için küresel kaynakların adayını çekmek neredeyse her
+// zaman "dil" damgasıyla biten boşa istek. Ama sıfırlamak da körlük olurdu:
+// Türkçe bir tel uluslararası bir yayında da alıntılanabiliyor. Küçük bir
+// pencere açık tutuluyor.
+const RESOLVE_EXPLORE = Number(process.env.XI_RESOLVE_EXPLORE || 5);
+// ⚠️ Yalnız bu diller saklanır (sayfa Türkçe pano). Dil ancak tweet ÇEKİLDİKTEN
+// sonra bilindiği için asıl tasarruf elemede değil SEÇİMDE: aday sıralaması
+// Türk kaynaklarını öne alır (bkz resolveNew), yoksa 40'lık bütçenin tamamı
+// İngilizce adaylara gidip "dil" damgası yiyordu. Bir kez elenen ID sicile
+// yazıldığı için bir daha çekilmez.
+const LANGS = (process.env.XI_LANGS || "tr").split(",").map((x) => x.trim()).filter(Boolean);
 const REFRESH_PER_RUN = Number(process.env.XI_REFRESH_PER_RUN || 40);
 // "Sıcak" pencere: bu yaştan genç teller bütçenin %60'ını alır.
 const HOT_HOURS = Number(process.env.XI_HOT_HOURS || 24);
@@ -136,11 +157,11 @@ async function fetchArticleHtml(url) {
 async function scanFeeds() {
   // İki şerit: üretkenler (her koşu) + keşif rotasyonu (FIFO).
   const [prod, disc] = await Promise.all([
-    sb.from("sources").select("id,url,name,section,x_found_count")
+    sb.from("sources").select("id,url,name,section,lang,country,x_found_count")
       .eq("active", true).gt("x_found_count", 0)
       .order("x_found_count", { ascending: false })
       .limit(XI_PRODUCTIVE_PER_RUN),
-    sb.from("sources").select("id,url,name,section,x_found_count")
+    sb.from("sources").select("id,url,name,section,lang,country,x_found_count")
       .eq("active", true).eq("x_found_count", 0)
       .order("x_scanned_at", { ascending: true, nullsFirst: true })
       .limit(XI_FEEDS_PER_RUN),
@@ -180,7 +201,17 @@ async function scanFeeds() {
         .join(" ");
       for (const id of extractTweetIds(blob)) {
         hits++;
-        if (!found.has(id)) found.set(id, { source_name: f.name, section: f.section ?? null, slug: null });
+        if (!found.has(id)) {
+          // ⚠️ Kaynağın ülkesi/dili adaya taşınıyor: tweet'in dili ancak
+          // çekilince bilinir, ama Türk kaynağından çıkan bir linkin Türkçe
+          // olma olasılığı çok yüksek. Seçim sırası buna dayanıyor.
+          found.set(id, {
+            source_name: f.name,
+            section: f.section ?? null,
+            slug: null,
+            trSource: f.country === "Türkiye" || f.lang === "tr",
+          });
+        }
       }
     }
     if (hits) perFeed.set(f.id, hits);
@@ -240,7 +271,7 @@ async function scanXSources() {
       // 1) Gövde taraması — bedava.
       const blob = [it.content, it["content:encoded"], it.summary, it.description].filter(Boolean).join(" ");
       for (const id of extractTweetIds(blob)) {
-        if (!found.has(id)) found.set(id, { source_name: s.name, section: null, slug: null });
+        if (!found.has(id)) found.set(id, { source_name: s.name, section: null, slug: null, lane: "xsrc" });
         perSource.set(s.id, (perSource.get(s.id) ?? 0) + 1);
       }
       // 2) Makale adayı.
@@ -274,7 +305,7 @@ async function scanXSources() {
     }
     const hits = extractTweetIds(html);
     for (const id of hits) {
-      if (!found.has(id)) found.set(id, { source_name: c.name, section: null, slug: null });
+      if (!found.has(id)) found.set(id, { source_name: c.name, section: null, slug: null, lane: "xsrc" });
     }
     if (hits.size) perSource.set(c.sourceId, (perSource.get(c.sourceId) ?? 0) + hits.size);
     scanRows.push({ url: c.url, found_count: hits.size });
@@ -344,33 +375,69 @@ async function resolveNew(found) {
   if (!found.size) return { added: 0, quoted: 0, rejected: 0, recovered: 0 };
   const ids = [...found.keys()];
 
-  // İki elek: (1) havuzda olanlar — aynı tweet onlarca haberde alıntılanıyor,
-  // (2) daha önce çözülemeyenler. ⚠️ İkincisi olmadan feed taraması her
-  // koşuda AYNI silinmiş/eski ID'leri yeniden çeker ve çözümleme bütçesini
-  // tamamen yer; ölçüldü: 60 beslemenin 43 ID'sinin çoğu turdan tura aynı.
-  const [{ data: existing }, { data: rejected }] = await Promise.all([
-    sb.from("tweets").select("id").in("id", ids),
-    sb.from("tweet_rejects").select("id").in("id", ids),
-  ]);
-  const skip = new Set([...(existing ?? []), ...(rejected ?? [])].map((r) => r.id));
-
-  // ⚠️ Üçüncü elek BEDAVA: tweet ID'si snowflake, gönderim zamanı içinde gömülü
-  // (tweetIdTime). Yaşı burada eleyince tek bir ağ isteği harcamıyoruz ve
-  // sicile de yazmıyoruz — kayıt tutmanın anlamı yok, kontrol her koşuda ücretsiz.
-  // Ölçüm: bu elek olmadan 40'lık bütçenin 39'u "eski" damgası yiyordu.
   const cutoff = Date.now() - KEEP_DAYS * 86400000;
-  const fresh = ids
-    .filter((id) => !skip.has(id) && tweetIdTime(id) >= cutoff)
-    // En taze linkler önce: havuzda yüzlerce aday varken bütçe bugünün
-    // tweet'lerine gitmeli, kuyruğun rastgele bir yerine değil.
-    .sort((a, b) => tweetIdTime(b) - tweetIdTime(a))
-    .slice(0, RESOLVE_PER_RUN);
-  if (!fresh.length) return { added: 0, quoted: 0, rejected: 0, recovered: 0 };
+  const byNewest = (a, b) => tweetIdTime(b) - tweetIdTime(a);
+  const eligible = ids.filter((id) => tweetIdTime(id) >= cutoff);
+
+  // ⚠️ Sıralama SADECE tazeliğe göre olamaz. Ölçüm 2026-08-21: koşu başına
+  // 2.800+ aday bulunuyor, ezici çoğunluğu küresel/İngilizce kaynaklardan ve
+  // dakikalık taze; Türk kaynaklarının telleri ise genelde saatler/günler
+  // eski (analiz ve doğrulama yazıları eski viral tweet'i alıntılıyor). Düz
+  // tazelik sıralaması Türkçe adayı HİÇ sıraya sokmuyordu.
+  //   1. kova — bağımsız X kaynak hattı (tamamı Türk yayını)
+  //   2. kova — Türk/Türkiye etiketli haber kaynakları
+  //   3. kova — geri kalan her şey
+  const bucket = (pred) => eligible.filter(pred).sort(byNewest);
+  const xsrc = bucket((id) => found.get(id)?.lane === "xsrc");
+  const trish = bucket((id) => found.get(id)?.lane !== "xsrc" && found.get(id)?.trSource);
+  const rest = bucket((id) => found.get(id)?.lane !== "xsrc" && !found.get(id)?.trSource);
+  // Ayrılmış pay bir TAVAN değil TABAN: kullanılmayan slot aşağıya akar.
+  const ordered = [
+    ...xsrc.slice(0, RESOLVE_XSRC_RESERVED),
+    ...trish,
+    ...xsrc.slice(RESOLVE_XSRC_RESERVED),
+    // 3. kova KISITLI: bkz RESOLVE_EXPLORE.
+    ...rest.slice(0, RESOLVE_EXPLORE),
+  ];
+
+  // ⚠️⚠️ Bilinen ID elemesi PARÇALI ve HATA KONTROLLÜ yapılmak ZORUNDA.
+  // Önceki sürüm tüm aday listesini tek `.in()` sorgusuna koyuyordu; PostgREST
+  // "URI too long" döndürüyor, hata kontrol edilmediği için `data` null geliyor
+  // ve eleme kümesi BOŞ kalıyordu. Sonuç sessiz ve pahalı: her koşuda 40 slotun
+  // tamamı ZATEN havuzda olan tweet'leri yeniden çekmeye gidiyordu ("eklenen 15"
+  // yazıp havuzun 60'ta sabit kalması bu yüzdendi). Ayrıca PostgREST tek
+  // istekte en fazla 1000 satır döndürür — parça boyu bunun çok altında.
+  const CHECK_HEAD = Math.min(ordered.length, RESOLVE_PER_RUN * 10);
+  const head = ordered.slice(0, CHECK_HEAD);
+  const skip = new Set();
+  for (const table of ["tweets", "tweet_rejects"]) {
+    for (let i = 0; i < head.length; i += 200) {
+      const { data, error } = await sb.from(table).select("id").in("id", head.slice(i, i + 200));
+      if (error) {
+        // Elemeyi yapamadıysak DURMAK doğrusu: eleme kümesi eksikken devam
+        // etmek bütçeyi bilinen tweet'lere harcamak demek.
+        log(`eleme sorgusu hatası (${table}): ${error.message}`);
+        return { added: 0, quoted: 0, rejected: 0, recovered: 0, fromXsrc: 0 };
+      }
+      data.forEach((r) => skip.add(r.id));
+    }
+  }
+
+  const fresh = head.filter((id) => !skip.has(id)).slice(0, RESOLVE_PER_RUN);
+  // Kova kırılımı: "neden yeni tel gelmedi?" sorusu log'dan cevaplanmalı.
+  // aday = bulunan, yeni = havuzda/sicilde olmayan.
+  log(
+    `aday: X-kaynak ${xsrc.length} (yeni ${xsrc.filter((id) => !skip.has(id)).length}), ` +
+      `TR-kaynak ${trish.length} (yeni ${trish.filter((id) => !skip.has(id)).length}), ` +
+      `diğer ${rest.length} (keşif payı ${RESOLVE_EXPLORE})`,
+  );
+  if (!fresh.length) return { added: 0, quoted: 0, rejected: 0, recovered: 0, fromXsrc: 0 };
 
   const rows = [];
   const rejects = [];
   let quoted = 0;
   let recovered = 0;
+  let fromXsrc = 0;
   const now = new Date().toISOString();
   const tooOld = (iso) => Date.now() - Date.parse(iso) > KEEP_DAYS * 86400000;
 
@@ -396,6 +463,10 @@ async function resolveNew(found) {
       rejects.push({ id, reason: "metinsiz" });
       return;
     }
+    if (!LANGS.includes(t.lang)) {
+      rejects.push({ id, reason: `dil:${t.lang}` });
+      return;
+    }
     // Kesilmiş uzun gönderiyi kurtarmayı dene. Başarısızlık ZARARSIZ:
     // `truncated` true kalır ve kart "X'te tamamını oku" bağlantısı gösterir.
     if (t.truncated && fullBudget > 0) {
@@ -409,6 +480,7 @@ async function resolveNew(found) {
     }
 
     const src = found.get(id) ?? {};
+    if (src.lane === "xsrc") fromXsrc++;
     rows.push({
       ...t,
       found_via: "article",
@@ -420,7 +492,7 @@ async function resolveNew(found) {
 
     // Alıntılanan tweet AYNI yanıtın içinde tam haliyle geliyor — bedava tel.
     const q = quotedTweetOf(raw);
-    if (q && q.posted_at && !tooOld(q.posted_at) && !skip.has(q.id) && q.text.trim() && q.lang !== "und") {
+    if (q && q.posted_at && !tooOld(q.posted_at) && !skip.has(q.id) && q.text.trim() && LANGS.includes(q.lang)) {
       quoted++;
       rows.push({
         ...q,
@@ -437,7 +509,7 @@ async function resolveNew(found) {
     const { error } = await sb.from("tweet_rejects").upsert(rejects, { onConflict: "id" });
     if (error) log("sicil hatası:", error.message);
   }
-  if (!rows.length) return { added: 0, quoted: 0, rejected: rejects.length, recovered };
+  if (!rows.length) return { added: 0, quoted: 0, rejected: rejects.length, recovered, fromXsrc };
 
   // Aynı koşuda hem doğrudan hem alıntı olarak gelen ID tekrarlanabilir;
   // upsert'e çift anahtar vermek PostgREST'te hata döndürür.
@@ -445,9 +517,9 @@ async function resolveNew(found) {
   const { error } = await sb.from("tweets").upsert(uniq, { onConflict: "id" });
   if (error) {
     log("ekleme hatası:", error.message);
-    return { added: 0, quoted: 0, rejected: rejects.length, recovered };
+    return { added: 0, quoted: 0, rejected: rejects.length, recovered, fromXsrc };
   }
-  return { added: uniq.length, quoted, rejected: rejects.length, recovered };
+  return { added: uniq.length, quoted, rejected: rejects.length, recovered, fromXsrc };
 }
 
 async function refresh() {
@@ -589,7 +661,7 @@ async function main() {
   for (const [id, src] of xsrc.found) found.set(id, src);
   for (const [id, src] of article.found) found.set(id, src); // makale izi daha zengin (dispatch slug'ı var)
 
-  const { added, quoted, rejected, recovered } = await resolveNew(found);
+  const { added, quoted, rejected, recovered, fromXsrc } = await resolveNew(found);
   const { updated, closed, refreshRecovered } = await refresh();
   const deleted = await prune();
 
@@ -608,7 +680,7 @@ async function main() {
   // Tek satırlık özet — "neden az tweet geldi?" sorusu log'dan cevaplanabilsin.
   log(
     `özet: feed ${feed.ok}/${feed.feeds} (üretken ${feed.productive}, ${feed.items} öğe) + makale ${article.scanned} (${article.failed} erişilemedi) + X-kaynak ${xsrc.sources}/${xsrc.articles} ` +
-      `→ ${found.size} link, eklenen ${added} (alıntı ${quoted}), tam metin ${recovered + refreshRecovered}, elenen ${rejected}, tazelenen ${updated}, kapatılan ${closed}, budanan ${deleted}`,
+      `→ ${found.size} link, eklenen ${added} (X-kaynak ${fromXsrc}, alıntı ${quoted}), tam metin ${recovered + refreshRecovered}, elenen ${rejected}, tazelenen ${updated}, kapatılan ${closed}, budanan ${deleted}`,
   );
 }
 

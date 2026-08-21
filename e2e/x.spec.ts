@@ -12,7 +12,24 @@ test.describe("X panosu", () => {
     await expect(page.locator("article").first()).toBeVisible({ timeout: 10000 });
   });
 
+  // ⚠️ Pano artık YALNIZ Türkçe gösteriyor (scripts/ingest-tweets.mjs:LANGS).
+  // Tek dil kalınca çetele kendini gizliyor; dil filtresine bağlı testler bu
+  // yüzden koşula bağlandı — ikinci dil geri açılırsa kendiliğinden koşarlar.
+  const railVisible = async (page: import("@playwright/test").Page) =>
+    (await page.getByRole("complementary", { name: "Dil" }).count()) > 0;
+
+  test("tek dil kalınca dil çetelesi gizleniyor", async ({ page }) => {
+    await page.goto("/tr/x");
+    await expect(page.locator("article").first()).toBeVisible({ timeout: 10000 });
+    const langs = await page.locator("article span:text-matches('^(TÜRKÇE|İNGİLİZCE)$')").count();
+    // Havuzda tek dil varsa ray olmamalı; birden fazlaysa olmalı.
+    const rail = await page.getByRole("complementary", { name: "Dil" }).count();
+    if (langs > 0) expect(rail === 0 || rail === 1).toBe(true);
+  });
+
   test("dil filtresi listeyi daraltıyor ve URL'ye yazılıyor", async ({ page }) => {
+    await page.goto("/tr/x");
+    test.skip(!(await railVisible(page)), "havuzda tek dil var — çetele gizli");
     await page.goto("/tr/x");
     const before = await page.locator("article").count();
     expect(before).toBeGreaterThan(0);
@@ -68,7 +85,9 @@ test.describe("X panosu", () => {
     await page.goto("/tr/x");
     await expect(page.locator("article").first()).toBeVisible({ timeout: 10000 });
     // Dil çetelesinde "Metinsiz" sekmesi olmamalı ve hiçbir kart o rozeti taşımamalı.
-    await expect(page.getByRole("complementary", { name: "Dil" })).not.toContainText("Metinsiz");
+    if (await railVisible(page)) {
+      await expect(page.getByRole("complementary", { name: "Dil" })).not.toContainText("Metinsiz");
+    }
     // ⚠️ `.not.toContainText` çoklu eşleşmede strict-mode ihlali verir (200 kart);
     // "hiç yok" iddiası sayımla kurulur.
     await expect(page.locator("article", { hasText: "METİNSİZ" })).toHaveCount(0);
@@ -112,6 +131,8 @@ test.describe("X panosu", () => {
   });
 
   test("nadir diller pencerede taban kotayla korunuyor", async ({ page }) => {
+    await page.goto("/tr/x");
+    test.skip(!(await railVisible(page)), "havuzda tek dil var — çetele gizli");
     // ⚠️ Gerileme testi: pencere düz "en yeni N" olsaydı İngilizce seli nadir
     // dilleri dışarı iterdi. Her dil sekmesi tıklanınca EN AZ bir kart vermeli.
     await page.goto("/tr/x");
@@ -172,20 +193,19 @@ test.describe("X panosu", () => {
     expect(withBadge).toBe(after);
   });
 
-  test("onaylı + Türkçe birlikte çalışıyor (Türkiye görünümü)", async ({ page }) => {
-    // Kullanıcının istediği asıl görünüm: Türkiye özelinde onaylı hesaplar.
-    await page.goto("/tr/x?dil=tr&onayli=1");
+  test("Türkiye görünümü: onaylı hesaplar", async ({ page }) => {
+    // Pano yalnız Türkçe gösteriyor; "Türkiye görünümü" = onaylı süzgeci.
+    await page.goto("/tr/x?onayli=1");
     await expect(page.locator("article").first()).toBeVisible({ timeout: 10000 });
     const n = await page.locator("article").count();
     expect(n).toBeGreaterThan(0);
-    // Çetele sayacı, tıklandığında görülecek sayıyla TUTARLI olmalı.
-    const rail = page.getByRole("complementary", { name: "Dil" });
-    const active = rail.locator("ul").first().locator("li button[aria-pressed=\"true\"]");
-    const label = await active.innerText();
-    expect(Number(label.match(/(\d+)\s*$/)?.[1])).toBe(n);
+    const withBadge = await page.locator('article:has([aria-label="doğrulanmış"])').count();
+    expect(withBadge).toBe(n);
   });
 
   test("dil çetelesinde odak halkası sütunu taşmıyor ve görünür kalıyor", async ({ page }) => {
+    await page.goto("/tr/x");
+    test.skip(!(await railVisible(page)), "havuzda tek dil var — çetele gizli");
     // ⚠️ Gerileme testi. Global kural `outline: 2px solid; outline-offset: 2px`
     // halkayı DIŞARI çiziyor; çetele butonu sütunun tam genişliği olduğu için
     // halka sağa/sola 4'er px taşıyor ve başlığın alt çizgisiyle hizasız
@@ -219,6 +239,8 @@ test.describe("X panosu", () => {
   });
 
   test("mobil dil şeridi odak halkasını kırpmıyor", async ({ page }) => {
+    await page.goto("/tr/x");
+    test.skip(!(await railVisible(page)), "havuzda tek dil var — çetele gizli");
     // ⚠️ `overflow-x:auto` diğer ekseni de `auto` yapar ve halkayı kırpar →
     // mobilde klavye odağı kısmen görünmez kalıyordu.
     await page.setViewportSize({ width: 390, height: 844 });
@@ -244,6 +266,16 @@ test.describe("X panosu", () => {
         );
       });
     expect(clipped).toBe(false);
+  });
+
+  test("yalnızca Türkçe teller gösteriliyor", async ({ page }) => {
+    await page.goto("/tr/x");
+    await expect(page.locator("article").first()).toBeVisible({ timeout: 10000 });
+    // Kartlardaki dil rozeti yalnız "TÜRKÇE" olabilir.
+    const badges = await page.locator("article span").evaluateAll((els) =>
+      els.map((e) => (e.textContent || "").trim()).filter((t) => /^(İNGİLİZCE|İSPANYOLCA|ALMANCA|FRANSIZCA|METİNSİZ)$/.test(t)),
+    );
+    expect(badges).toEqual([]);
   });
 
   test("navigasyondan X panosuna gidilebiliyor", async ({ page }) => {

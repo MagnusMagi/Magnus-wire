@@ -37,7 +37,7 @@ const STRINGS: Record<Locale, Dict> = {
     copy: "© 2026 MagiWire — prototip", agoNow: "az önce", agoMin: "dk önce", agoHour: "sa önce", follow: "Takip Et", followBlurb: "Otomatik, kişisel bir teknoloji akışı. RSS ile takip et.", rssBtn: "RSS akışı →", about2: "Proje hakkında →", source: "Kaynak", viaSource: "kaynak", siteLogout: "Çıkış yap", regionsLabel: "Bölge", panelsLabel: "Pano",
     // ── X panosu ────────────────────────────────────────────────────────
     xKicker: "Sosyal masa", xTitle: "X'te Gündem",
-    xSub: "Haberlerimizin kaynaklarında alıntılanan tweet'ler tek yerde; etkileşimine ve tazeliğine göre sıralanır, diline göre süzülür.",
+    xSub: "Türkiye gündeminden onaylı hesapların telleri tek yerde; etkileşimine ve tazeliğine göre sıralanır.",
     xLangFilter: "Dil", xCount: "tel", xSortPopular: "Popüler", xSortRecent: "Yeni",
     xEmpty: "Havuz henüz boş — tarayıcı ilk tweet'leri bekliyor.",
     xEmptyLang: "Bu dilde tweet yok.", xVerifiedOnly: "Onaylı", xEmptyVerified: "Bu seçimde onaylı hesap teli yok.",
@@ -71,7 +71,7 @@ const STRINGS: Record<Locale, Dict> = {
     copy: "© 2026 MagiWire — prototype", agoNow: "just now", agoMin: "min ago", agoHour: "h ago", follow: "Follow", followBlurb: "An automated, personal tech feed. Follow via RSS.", rssBtn: "RSS feed →", about2: "About the project →", source: "Source", viaSource: "via", siteLogout: "Log out", regionsLabel: "Regions", panelsLabel: "Panels",
     // ── X board ─────────────────────────────────────────────────────────
     xKicker: "Social desk", xTitle: "Talk on X",
-    xSub: "Tweets quoted by the sources behind our dispatches, gathered in one place — ranked by engagement and freshness, filtered by language.",
+    xSub: "Posts from Turkey's agenda, gathered in one place — ranked by engagement and freshness.",
     xLangFilter: "Language", xCount: "posts", xSortPopular: "Popular", xSortRecent: "Latest",
     xEmpty: "The pool is still empty — the scanner is waiting for its first tweets.",
     xEmptyLang: "No tweets in this language.", xVerifiedOnly: "Verified", xEmptyVerified: "No verified-account posts in this selection.",
@@ -105,7 +105,7 @@ const STRINGS: Record<Locale, Dict> = {
     copy: "© 2026 MagiWire — prototüüp", agoNow: "äsja", agoMin: "min tagasi", agoHour: "t tagasi", follow: "Jälgi", followBlurb: "Automaatne isiklik tehnoloogiavoog. Jälgi RSS kaudu.", rssBtn: "RSS-voog →", about2: "Projektist →", source: "Allikas", viaSource: "allikas", siteLogout: "Logi välja", regionsLabel: "Piirkond", panelsLabel: "Paneelid",
     // ── X paneel ────────────────────────────────────────────────────────
     xKicker: "Sotsiaallaud", xTitle: "Jutt X-is",
-    xSub: "Meie uudiste allikates tsiteeritud säutsud ühes kohas — järjestatud kaasatuse ja värskuse järgi, filtreeritud keele kaupa.",
+    xSub: "Türgi päevakajast pärit postitused ühes kohas — järjestatud kaasatuse ja värskuse järgi.",
     xLangFilter: "Keel", xCount: "postitust", xSortPopular: "Populaarsed", xSortRecent: "Värsked",
     xEmpty: "Kogum on veel tühi — skanner ootab esimesi säutse.",
     xEmptyLang: "Selles keeles säutse pole.", xVerifiedOnly: "Kinnitatud", xEmptyVerified: "Selles valikus pole kinnitatud kontode postitusi.",

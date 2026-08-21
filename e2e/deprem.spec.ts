@@ -34,7 +34,11 @@ test.describe("Deprem (earthquake) page", () => {
     await page.getByRole("button", { name: "Dünya · USGS" }).click();
     await page.getByRole("button", { name: "M5+" }).click();
     // either zero results (allowed) or every visible row's magnitude >= 5
-    const mags = await page.locator("main .divide-y > button .font-serif").allInnerTexts();
+    // ⚠️ Selector must target ONLY the magnitude square. `.font-serif` alone
+    // also matches the place name, and place names often start with a number
+    // ("1 km N of Alegria") — parseFloat then yields 1 and the test fails on
+    // correct data. `.tabular-nums` is unique to the magnitude square.
+    const mags = await page.locator("main .divide-y > button .font-serif.tabular-nums").allInnerTexts();
     for (const m of mags) {
       const v = parseFloat(m);
       if (!Number.isNaN(v)) expect(v).toBeGreaterThanOrEqual(5);
