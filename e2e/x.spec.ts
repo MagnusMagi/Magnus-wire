@@ -47,11 +47,30 @@ test.describe("X panosu", () => {
     expect(label.length).toBeGreaterThan(0);
   });
 
-  test("sıralama Yeni'ye geçince URL'ye yazılıyor ve sıra değişebiliyor", async ({ page }) => {
+  test("varsayılan sıralama YENİ; Popüler'e geçiş URL'ye yazılıyor", async ({ page }) => {
+    // ⚠️ Varsayılan bilinçli olarak YENİ. Popüler sıralamada sönüm katsayısı
+    // yeni ama az etkileşimli teli listenin çok altına atıyordu; akış çalıştığı
+    // halde sayfa "güncellenmiyor" görünüyordu.
     await page.goto("/tr/x");
-    await page.getByRole("button", { name: "Yeni" }).click();
-    await expect(page).toHaveURL(/[?&]sirala=yeni/);
+    await expect(page.locator("article").first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole("button", { name: "Yeni" })).toHaveAttribute("aria-pressed", "true");
+    // Varsayılan olduğu için URL'de parametre OLMAMALI.
+    expect(new URL(page.url()).searchParams.get("sirala")).toBeNull();
+
+    await page.getByRole("button", { name: "Popüler" }).click();
+    await expect(page).toHaveURL(/[?&]sirala=populer/);
     await expect(page.locator("article").first()).toBeVisible();
+  });
+
+  test("Yeni sıralamada en taze tel başta", async ({ page }) => {
+    await page.goto("/tr/x");
+    await expect(page.locator("article").first()).toBeVisible({ timeout: 10000 });
+    const times = await page.locator("article time").evaluateAll((els) =>
+      els.map((e) => Date.parse(e.getAttribute("datetime") || "")).filter((n) => !Number.isNaN(n)),
+    );
+    expect(times.length).toBeGreaterThan(1);
+    // Azalan sırada olmalı (eşitlik serbest).
+    for (let i = 1; i < times.length; i++) expect(times[i]).toBeLessThanOrEqual(times[i - 1]);
   });
 
   test("kart özgün tweet'e giden bağlantı taşıyor (X Display Requirements)", async ({ page }) => {

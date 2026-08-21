@@ -22,7 +22,12 @@ const TOP_THRESHOLD_PX = 200;
 
 export function XBoard({ tweets: initial, locale }: { tweets: Tweet[]; locale: Locale }) {
   const [lang, setLang] = useState<string>(ALL);
-  const [sort, setSort] = useState<SortKey>("popular");
+  // ⚠️ Varsayılan YENİ. Popüler sıralamada sönüm katsayısı yüzünden yeni ama
+  // az etkileşimli bir tel listenin çok altına düşüyor: 24 dakikalık 5
+  // beğenili telin skoru ~1,6 iken 8 saatlik 3.000 beğenili telinki ~136.
+  // Sonuç, akış çalıştığı halde sayfanın "güncellenmiyor" görünmesiydi.
+  // Popüler bir tık uzakta duruyor.
+  const [sort, setSort] = useState<SortKey>("recent");
   // ⚠️ Onaylı filtresi bir SIRALAMA ayarı değil, kapsam ayarı: havuzun %80'i
   // zaten onaylı olduğu için "onaylıyı üste al" gibi bir puanlama anlamsız
   // olurdu; ayırt edici olan onaysızları TAMAMEN dışarıda bırakabilmek.
@@ -96,7 +101,7 @@ export function XBoard({ tweets: initial, locale }: { tweets: Tweet[]; locale: L
     const l = p.get("dil");
     const s = p.get("sirala");
     if (l && (l === ALL || counts.some((c) => c.code === l))) setLang(l);
-    if (s === "yeni") setSort("recent");
+    if (s === "populer") setSort("popular");
     if (p.get("onayli") === "1") setOnlyVerified(true);
     // counts yalnız veri değişince değişir; ilk mount'ta çalışması yeterli.
   }, [counts]);
@@ -105,8 +110,8 @@ export function XBoard({ tweets: initial, locale }: { tweets: Tweet[]; locale: L
     const p = new URLSearchParams(window.location.search);
     if (lang === ALL) p.delete("dil");
     else p.set("dil", lang);
-    if (sort === "popular") p.delete("sirala");
-    else p.set("sirala", "yeni");
+    if (sort === "recent") p.delete("sirala");
+    else p.set("sirala", "populer");
     if (onlyVerified) p.set("onayli", "1");
     else p.delete("onayli");
     const qs = p.toString();
@@ -258,7 +263,12 @@ export function XBoard({ tweets: initial, locale }: { tweets: Tweet[]; locale: L
                 : t(locale, "xEmptyLang")}
           </p>
         ) : (
-          <div className="max-w-[720px]">
+          // ⚠️ Genişlik ray'e bağlı: ray varken 720px'lik okuma sütunu doğru,
+          // ray gizliyken o sınır sayfanın sağını boş bırakıyordu — teller
+          // tam genişlik kullanır. (JSX yorumu ternary'nin İÇİNE konamaz:
+          // parantezli ifade tek bir eleman bekler, iki komşu ifade sözdizimi
+          // hatası verir.)
+          <div className={showRail ? "max-w-[720px]" : ""}>
             {list.map((tw, i) => (
               <TweetCard
                 key={tw.id}
