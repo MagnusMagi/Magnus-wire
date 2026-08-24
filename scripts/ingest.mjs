@@ -99,6 +99,7 @@ const TOPICS = {
   "bilim": "Bilim", "uzay": "Uzay", "kripto": "Kripto", "siber": "Siber",
   "savunma": "Savunma", "otomobil": "Otomobil", "oyun": "Oyun", "spor": "Spor",
   "kultur": "Kültür", "tasarim": "Tasarım", "yasam": "Yaşam",
+  "fotograf": "Fotoğraf",
 };
 // site.ts'teki REGIONS ile aynı küme olmalı.
 const REGIONS = new Set(["turkiye", "estonya", "avrupa", "abd", "asya", "amerika", "afrika", "okyanusya", "dunya"]);

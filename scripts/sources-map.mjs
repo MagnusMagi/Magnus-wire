@@ -38,7 +38,9 @@ export const CATEGORY_TO_SECTION = {
   "Movies": "kultur", "Television": "kultur", "Books": "kultur",
   "Music": "kultur", "History": "kultur",
   "Interior design": "tasarim", "Architecture": "tasarim",
-  "UI / UX": "tasarim", "DIY": "tasarim", "Photography": "tasarim",
+  "UI / UX": "tasarim", "DIY": "tasarim",
+  // "Photography" 2026-08-24'e kadar tasarim'e düşüyordu; artık kendi bölümü var.
+  "Photography": "fotograf", "PhotographySchool": "fotograf",
   "Food": "yasam", "Travel": "yasam", "Beauty": "yasam",
   "Fashion": "yasam", "Funny": "yasam",
   // /hava canlı hava panosu, haber listesi değil — bu kaynağı zorlamıyoruz.

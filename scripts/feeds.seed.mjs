@@ -89,4 +89,27 @@ export const FEED_SEED = [
   { url: "https://uxdesign.cc/feed", section: "tasarim" },
   { url: "https://www.elle.com/rss/beauty.xml/", section: "yasam" },
   { url: "https://www.theguardian.com/uk/travel/rss", section: "yasam" },
+
+  // ── Fotoğraf ekipmanı ──────────────────────────────────────────────────
+  // Hepsi `section: "fotograf"` ile SABİT: bunlar pür fotoğrafçılık yayınları,
+  // AI sınıflamasına bırakmak onları donanim/tasarim arasında dağıtırdı.
+  // (Genel bir beslemeye section YAZMAK yanlış olurdu — o tuzak ayrı.)
+  //
+  // Liste 2026-08-24'te ÖLÇÜLEREK seçildi (14 aday denendi):
+  //   B&H Explora      → 403
+  //   Photography Blog → 404
+  //   LensRentals      → canlı ama en yeni yazı 21 Temmuz, bayat
+  // Bu üçü alınmadı. Aşağıdakiler o gün 7 günlük pencerede üretim gösterdi;
+  // yanlarındaki sayı o penceredeki öğe / kullanıcının ekipmanıyla eşleşen.
+  { url: "https://www.sonyalpharumors.com/feed/", section: "fotograf" },      // 7/3 — E-mount sinyali en yüksek kaynak
+  { url: "https://www.dpreview.com/feeds/news.xml", section: "fotograf" },    // 18/0
+  { url: "https://petapixel.com/feed/", section: "fotograf" },                // 20/0
+  { url: "https://www.digitalcameraworld.com/feeds/all", section: "fotograf" }, // 50/0 — hacmi en yüksek
+  { url: "https://amateurphotographer.com/feed/", section: "fotograf" },      // 36/1
+  { url: "https://fstoppers.com/feed", section: "fotograf" },                 // 30/1
+  { url: "https://www.thephoblographer.com/feed/", section: "fotograf" },     // 15/0
+  { url: "https://www.diyphotography.net/feed/", section: "fotograf" },       // 10/0
+  { url: "https://www.canonrumors.com/feed/", section: "fotograf" },          // 10/0
+  { url: "https://www.fujirumors.com/feed/", section: "fotograf" },           // 5/0 — X-M5 için
+  { url: "https://www.43rumors.com/feed/", section: "fotograf" },             // 7/0
 ];

@@ -27,6 +27,12 @@ export const TOPICS: Section[] = [
   { slug: "spor", kind: "topic", label: { tr: "Spor", en: "Sports", et: "Sport" } },
   { slug: "kultur", kind: "topic", label: { tr: "Kültür", en: "Culture", et: "Kultuur" } },
   { slug: "tasarim", kind: "topic", label: { tr: "Tasarım", en: "Design", et: "Disain" } },
+  // Fotoğraf ekipmanı haberi gerçekten kendi konusu: ölçüm 2026-08-24 — 690 telin
+  // yalnız 8'i kamera/lens geçiyordu ve hepsi `tasarim`e düşüyordu (kaynak
+  // eşlemesi "Photography" → tasarim idi). Ayrı eksen (savaş deseni) DEĞİL:
+  // bir Sigma lens duyurusunun ayrıca gündemde olmasına gerek yok, o yüzden
+  // normal bir bölüm.
+  { slug: "fotograf", kind: "topic", label: { tr: "Fotoğraf", en: "Photography", et: "Fotograafia" } },
   { slug: "yasam", kind: "topic", label: { tr: "Yaşam", en: "Life", et: "Elu" } },
   { slug: "borsa", kind: "topic", label: { tr: "Borsa", en: "Markets", et: "Börs" } },
   { slug: "hava", kind: "topic", label: { tr: "Hava", en: "Weather", et: "Ilm" } },

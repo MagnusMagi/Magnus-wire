@@ -14,6 +14,7 @@ import { mdxComponents } from "@/components/mdx";
 import { ContactForm } from "@/components/ContactForm";
 import { dispatchesBySection, dispatchesByRegion, agoLabel, latestTs } from "@/lib/dispatches";
 import { TOPIC_SLUGS, REGION_SLUGS, sectionLabel } from "@/lib/site";
+import { matchGear, gearStripTitle, gearStripNote, type GearItem } from "@/lib/gear";
 import { LOCALES, t, isLocale, type Locale } from "@/lib/i18n";
 import { SITE_URL, altLanguages } from "@/lib/seo";
 
@@ -47,6 +48,7 @@ export default async function SlugPage({ params }: { params: Promise<{ locale: s
     const isBorsa = slug === "borsa";
     const isHava = slug === "hava";
     const isDeprem = slug === "deprem";
+    const isFotograf = slug === "fotograf";
     // Borsa: piyasa panosu + finans haberleri. Hava/Deprem: yalnızca pano (haber yok).
     const list = isBorsa
       ? await dispatchesBySection(locale, "finans")
@@ -56,6 +58,23 @@ export default async function SlugPage({ params }: { params: Promise<{ locale: s
           ? await dispatchesBySection(locale, slug)
           : await dispatchesByRegion(locale, slug);
     const anchor = latestTs(list);
+
+    // Fotoğraf bölümü iki şeride ayrılır: önce Magnus'un GERÇEKTEN sahip olduğu
+    // gövde/lens/aksesuara değen haberler, sonra bölümün geri kalanı.
+    //
+    // Neden ayırma da filtreleme değil: 2026-08-24'te ölçüldü — aday
+    // beslemelerin 7 günlük penceresinde 208 öğe vardı ama yalnız 5'i
+    // a6700/E-mount ile ilgiliydi. Yalnız ekipmanı göstermek sayfayı çoğu gün
+    // boş bırakırdı; ayırmak hem doldurur hem kişiselleştirir.
+    // Tip koruyucu, `gear!` demeye gerek bırakmıyor: sade `.filter(x => x.gear)`
+    // TypeScript'e null'ın elendiğini ANLATMAZ, yalnız ünlemle susturulur.
+    const gearHits = isFotograf
+      ? list
+          .map((d) => ({ d, gear: matchGear(d.title, d.summary) }))
+          .filter((x): x is { d: (typeof list)[number]; gear: GearItem } => x.gear !== null)
+      : [];
+    const gearSlugs = new Set(gearHits.map((x) => x.d.slug));
+    const rest = isFotograf ? list.filter((d) => !gearSlugs.has(d.slug)) : list;
     return (
       <>
         <CatNav locale={locale} active={slug} />
@@ -77,16 +96,36 @@ export default async function SlugPage({ params }: { params: Promise<{ locale: s
           {isBorsa && <MarketsBoard locale={locale} />}
           {isHava && <WeatherBoard locale={locale} />}
           {isDeprem && <QuakeBoard locale={locale} />}
+          {isFotograf && gearHits.length > 0 && (
+            <section className="mb-8">
+              <h2 className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-signal border-b border-line pb-2 mb-1">
+                {gearStripTitle[locale]}
+              </h2>
+              <p className="font-mono text-[11px] text-ink-2 mb-4">{gearStripNote[locale]}</p>
+              <ul className="m-0 p-0 list-none max-w-[820px]">
+                {gearHits.map(({ d, gear }, i) => (
+                  <li key={d.slug} className="relative">
+                    <span className="absolute right-0 top-3 z-10 font-mono text-[10px] font-bold uppercase tracking-wider text-signal border border-signal px-1.5 py-0.5">
+                      {gear.label}
+                    </span>
+                    <Dispatch d={d} ago={agoLabel(d, anchor, locale)} index={i} locale={locale} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           {isBorsa && list.length > 0 && (
             <h2 className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-wire border-b border-line pb-2 mb-4">
               {t(locale, "marketNews")}
             </h2>
           )}
-          {list.length === 0 ? (
-            !isBorsa && !isHava && !isDeprem && <p className="font-mono text-ink-2 py-10">{t(locale, "emptySection")}</p>
+          {rest.length === 0 ? (
+            !isBorsa && !isHava && !isDeprem && gearHits.length === 0 && (
+              <p className="font-mono text-ink-2 py-10">{t(locale, "emptySection")}</p>
+            )
           ) : (
             <ul className="m-0 p-0 list-none max-w-[820px]">
-              {list.map((d, i) => (
+              {rest.map((d, i) => (
                 <Dispatch key={d.slug} d={d} ago={agoLabel(d, anchor, locale)} index={i} locale={locale} />
               ))}
             </ul>
