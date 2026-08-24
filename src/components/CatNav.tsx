@@ -60,8 +60,25 @@ export function CatNav({ locale, active = "akis" }: { locale: Locale; active?: s
 
   return (
     <nav aria-label="sections" className="sticky top-0 z-30 bg-paper border-b-2 border-ink">
-      {/* Üst katman: haber kategorileri */}
-      <ul className="mx-auto max-w-[1240px] flex items-center overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-6">
+      {/* Üst katman: haber kategorileri.
+
+          ⚠️ `pb-[2px] -mb-[2px]` süs değil, iki kusuru birden kapatıyor.
+          `overflow-x: auto` diğer ekseni de `auto`'ya hesaplatır (bir eksen
+          `visible` değilse öteki `visible` kalamaz), yani bu ray İKİ eksende
+          birden scroll container. Bağlantıların `-mb-[2px]`'i 3px'lik aktif
+          çizgiyi content box'ın 2px dışına taşıyordu:
+
+            • scrollHeight 43 / clientHeight 41 → parmakla 2px DİKEY kaydırma.
+              Fareyle görünmez; telefonda ilk hissedilen şey ve kullanıcı
+              tam bunu bildirdi.
+            • overflow padding box'ta kırptığı için aktif çizginin 3px'inin
+              yalnız 1px'i boyanıyordu — her sayfada, masaüstünde de.
+
+          Padding çizgiyi padding box'ın İÇİNE alır, negatif margin dış
+          yüksekliği korur: nav 82px, main üst kenarı 242px — önce/sonra aynı.
+          Aynı hata MagnusGeo nav'ında 13px olarak yaşandı; oradaki çare de
+          buydu. Bekçi: e2e/nav.spec.ts. */}
+      <ul className="mx-auto max-w-[1240px] flex items-center overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-6 pb-[2px] -mb-[2px]">
         {topic("akis", t(locale, "feed"))}
         {NEWS_TOPICS.map((s) => topic(s.slug, s.label[locale]))}
         <li aria-hidden className="flex-none w-3" />
