@@ -1,20 +1,25 @@
-import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { existsSync } from "node:fs";
-import path from "node:path";
+import { BlobNotFoundError, head, put } from "@vercel/blob";
 import { getDispatch } from "@/lib/dispatches";
 import { isLocale, type Locale } from "@/lib/i18n";
 import { clientIp, rateLimited } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
-// ⚠️ Reorg kalıntısı düzeltildi: burada "/home/ubuntu/news-app/.audio-cache"
-// yazılıydı — proje ~/apps/news-app'e taşındıktan sonra bile eski dizin var
-// olduğu için sessizce çalışmaya devam ediyordu. O dizin temizlenseydi her
-// dinleme yeniden OpenAI'ye gidip ücretlendirilirdi.
-// process.cwd() KULLANILAMAZ: standalone sunucu .next/standalone'dan koşuyor ve
-// orası her build'de siliniyor → önbellek her deploy'da sıfırlanırdı.
-// Bu yüzden yol env'den gelir (.env.local'de TTS_CACHE_DIR).
-const CACHE = process.env.TTS_CACHE_DIR || "/home/ubuntu/apps/news-app/.audio-cache";
+// Önbellek Vercel Blob'da (fonksiyon diski kalıcı değil; eskiden VPS'te
+// TTS_CACHE_DIR vardı). Önbellek kaybı = her dinlemede yeniden OpenAI ücreti.
+// ⚠️ Depo public ama adres istemciye VERİLMİYOR (yönlendirme yok, akış var):
+// site parola kapısının arkasında, ses dosyası kapıyı delmesin.
+const PREFIX = "tts/";
+const AUDIO_HEADERS = { "Content-Type": "audio/mpeg", "Cache-Control": "private, max-age=604800" };
+
+async function cachedUrl(pathname: string): Promise<string | null> {
+  try {
+    return (await head(pathname)).url;
+  } catch (e) {
+    if (e instanceof BlobNotFoundError) return null;
+    throw e;
+  }
+}
 
 export async function GET(req: Request) {
   const sp = new URL(req.url).searchParams;
@@ -22,11 +27,12 @@ export async function GET(req: Request) {
   const lraw = sp.get("locale") || "tr";
   const locale = (isLocale(lraw) ? lraw : "tr") as Locale;
   if (!slug) return new Response("bad", { status: 400 });
-  const file = path.join(CACHE, `${slug}-${locale}.mp3`);
+  const pathname = `${PREFIX}${slug}-${locale}.mp3`;
   try {
-    if (existsSync(file)) {
-      const buf = await readFile(file);
-      return new Response(new Uint8Array(buf), { headers: { "Content-Type": "audio/mpeg", "Cache-Control": "public, max-age=604800" } });
+    const url = await cachedUrl(pathname);
+    if (url) {
+      const cached = await fetch(url);
+      if (cached.ok && cached.body) return new Response(cached.body, { headers: AUDIO_HEADERS });
     }
     // Cache yok = OpenAI TTS maliyeti → IP başına dakikada 5 ile sınırla.
     if (rateLimited(`tts:${clientIp(req)}`, 5)) return new Response("rate", { status: 429 });
@@ -40,10 +46,15 @@ export async function GET(req: Request) {
     });
     if (!r.ok) return new Response("tts upstream error", { status: 502 });
     const buf = Buffer.from(await r.arrayBuffer());
-    await mkdir(CACHE, { recursive: true });
-    await writeFile(file, buf);
-    return new Response(new Uint8Array(buf), { headers: { "Content-Type": "audio/mpeg", "Cache-Control": "public, max-age=604800" } });
-  } catch {
+    // Önbelleğe yazamamak dinlemeyi bozmasın; ama sessiz de kalmasın.
+    try {
+      await put(pathname, buf, { access: "public", contentType: "audio/mpeg", addRandomSuffix: false, allowOverwrite: true });
+    } catch (e) {
+      console.error("tts: önbellek yazılamadı", e instanceof Error ? e.message : e);
+    }
+    return new Response(new Uint8Array(buf), { headers: AUDIO_HEADERS });
+  } catch (e) {
+    console.error("tts:", e instanceof Error ? e.message : e);
     return new Response("error", { status: 500 });
   }
 }
