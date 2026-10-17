@@ -540,14 +540,51 @@ pnpm test:e2e
 
 ---
 
-## 📜 Lisans
+## 📜 Lisans ve Telif Hakları
 
-MIT © [MagnusMagi](https://github.com/MagnusMagi) — kişisel hobi projesi.
+### Kaynak kodu — MIT
+
+Bu depodaki **yazılım** (`src/`, `scripts/`, yapılandırma dosyaları) [MIT Lisansı](LICENSE) ile lisanslanmıştır © 2026 [MagnusMagi](https://github.com/MagnusMagi). MIT lisansı **yalnızca kodu** kapsar; aşağıdaki içeriklere hiçbir hak vermez.
+
+### Haber içerikleri — MIT kapsamında DEĞİL
+
+- **Kaynak haberlerin telif hakkı yayıncılarına aittir.** MagiWire, yayıncıların herkese açık RSS beslemelerindeki haberlerden yapay zekâ ile kısa özetler üretir. Her telde orijinal kaynağın adı ve bağlantısı gösterilir. Kaynak gösterilmesi, içeriğin sahipliğinin veya kullanım hakkının devredildiği anlamına gelmez.
+- **Özetler kaynağın yerine geçmez.** Amaç okuru orijinal habere yönlendirmektir; haberin tamamı için her zaman kaynağa başvurulmalıdır.
+- **Ajans kaynakları kullanılmaz.** Haber ajanslarının beslemeleri kaynak havuzunda bilinçli olarak kapalıdır.
+- **Üçüncü taraf fotoğrafı kullanılmaz.** Haber kapakları kod tarafından üretilen tipografik görsellerdir (`src/components/DispatchCover.tsx`); yayıncıların görselleri yeniden yayımlanmaz.
+- **X (Twitter) gönderilerinin hakları yazarlarına aittir.** `/x` panosu yalnızca herkese açık gönderileri, X'in herkese açık gömme (syndication) ucundan alarak gösterir; her kart gönderinin X'teki aslına ve yazarın profiline bağlantı verir.
+- **Kaynak listesi** (`kaynaklar.md`, `scripts/feeds.seed.mjs`) yalnızca herkese açık besleme adreslerinden oluşur; bu adreslerin arkasındaki içeriklerin haklarını içermez.
+- **Kurumsal sayfa metinleri** (`content/pages/`) ve sitedeki tasarım öğeleri MIT kapsamında değildir; tüm hakları saklıdır.
+
+### Hak sahipleri için kaldırma talebi
+
+Bir içeriğin hak sahibiyseniz ve MagiWire'da yer almasını istemiyorsanız **magiwire@magnusmagi.com** adresine yazmanız yeterlidir. İlgili haber ve kaynak kaldırılır; talep ederseniz yayınınıza ait besleme kalıcı olarak havuzdan çıkarılır. Talepler gerekçe sorulmadan, mümkün olan en kısa sürede işlenir.
+
+### Ticari olmayan yayın
+
+MagiWire kâr amacı gütmez: reklam yok, içerik satılmaz, ödeme duvarı yoktur. Sunucu ve API giderleri gönüllü bağışlarla karşılanır; bağış hiçbir içeriğe erişim veya ayrıcalık karşılığı değildir.
+
+### Yapay zekâ uyarısı
+
+Özetler ve çeviriler yapay zekâ ile otomatik üretilir; hata, eksik veya bağlam kaybı içerebilir. Doğruluk için her zaman orijinal kaynağa başvurun. MagiWire haberlerin içeriğinden veya kaynak sitelerin bilgilerinden sorumluluk kabul etmez.
+
+<details>
+<summary>🇬🇧 English summary</summary>
+
+- **Code:** the software in this repository is MIT-licensed. The MIT license covers the **code only**.
+- **News content:** the copyright in the source articles belongs to their publishers. MagiWire publishes short AI-generated summaries of publicly available RSS items, always with the source name and a link. Attribution does not transfer any rights.
+- **No agency feeds or third-party photos:** news agency feeds are disabled; covers are generated typographic images.
+- **Posts on X** belong to their authors. Only public posts are shown, fetched from X's public embed (syndication) endpoint, and every card links to the original post and the author's profile.
+- **Takedown:** rights holders can email **magiwire@magnusmagi.com**. The item and source are removed, and on request the publication's feed is excluded permanently. No justification is required.
+- **Non-commercial:** no ads, no paywall, no content sales. Donations cover infrastructure only and buy no access or privileges.
+- **AI disclaimer:** summaries and translations are machine-generated and may contain errors. Always consult the original source.
+
+</details>
 
 <div align="center">
 <br/>
 
-**[🌐 news.magnusmagi.com](https://news.magnusmagi.com)** &nbsp;·&nbsp; Next.js 16 + Supabase + OpenAI ile ⚡ inşa edildi
+**[🌐 news.magnusmagi.com](https://news.magnusmagi.com)** &nbsp;·&nbsp; Next.js 16 + Neon + OpenAI ile ⚡ inşa edildi
 
 <sub>Bu içerik yapay zeka ile üretilir; ayrıntı için her zaman kaynağa göz atın.</sub>
 
