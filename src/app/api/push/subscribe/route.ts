@@ -1,4 +1,4 @@
-import { supabaseAdmin } from "@/lib/supabase";
+import { db } from "@/lib/db";
 import { isLocale } from "@/lib/i18n";
 import { clientIp, rateLimited } from "@/lib/ratelimit";
 
@@ -16,10 +16,14 @@ export async function POST(req: Request) {
   if (!endpoint || !p256dh || !auth || !/^https:\/\//.test(endpoint))
     return Response.json({ error: "invalid subscription" }, { status: 422 });
   try {
-    const sb = supabaseAdmin();
-    const { error } = await sb.from("push_subscriptions")
-      .upsert({ endpoint, p256dh, auth, locale }, { onConflict: "endpoint" });
-    if (error) return Response.json({ error: "store" }, { status: 500 });
+    const sql = db();
+    try {
+      await sql`
+        insert into push_subscriptions (endpoint, p256dh, auth, locale) values (${endpoint}, ${p256dh}, ${auth}, ${locale})
+        on conflict (endpoint) do update set p256dh = excluded.p256dh, auth = excluded.auth, locale = excluded.locale`;
+    } catch {
+      return Response.json({ error: "store" }, { status: 500 });
+    }
     return Response.json({ ok: true });
   } catch {
     return Response.json({ error: "server" }, { status: 500 });

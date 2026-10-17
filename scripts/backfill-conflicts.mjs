@@ -13,13 +13,13 @@
 // kelime ELEMESİ yapılır (başlık+spot+etiketler), yalnız ilgili olabilecekler
 // modele sorulur. Ölçüm 2026-08-18: 254 telin ~%10'u eleği geçiyor, yani
 // koşu başına birkaç kuruş.
-import { createClient } from "@supabase/supabase-js";
+import { connect } from "./lib/db.mjs";
 import { loadEnv, requireEnv } from "./env.mjs";
 import { CONFLICTS, conflictAllowed } from "./lib/conflicts.mjs";
 
 loadEnv();
-const [SUPABASE_URL, SERVICE_ROLE, OPENAI_API_KEY] = requireEnv(
-  "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "OPENAI_API_KEY",
+const [OPENAI_API_KEY] = requireEnv(
+  "OPENAI_API_KEY",
 );
 // Denetim gibi seyrek koşan, doğruluk isteyen iş → kendi modeli.
 // OPENAI_MODEL BİLEREK okunmuyor: o ingest'e ait ve ucuz modele sabitli.
@@ -82,11 +82,14 @@ SADECE şu JSON'u döndür (yalnız çatışmaya AİT olanları listele, gerisin
 }
 
 async function main() {
-  const sb = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
-  let q = sb.from("dispatches").select("id,slug,title,summary,tags,conflict").order("published_at", { ascending: false }).limit(1000);
-  if (!ALL) q = q.is("conflict", null);
-  const { data, error } = await q;
-  if (error) { log("okuma hatası", error.message); process.exit(1); }
+  const sql = connect();
+  let data;
+  try {
+    data = await sql`
+      select id, slug, title, summary, tags, conflict from dispatches
+       where ${ALL ? sql`true` : sql`conflict is null`}
+       order by published_at desc limit 1000`;
+  } catch (e) { log("okuma hatası", e.message); process.exit(1); }
 
   const aday = data.filter((r) => SIEVE.test(`${r.title} ${r.summary} ${(r.tags || []).join(" ")}`));
   log(`tel: ${data.length} | elekten geçen: ${aday.length} | model: ${MODEL}`);
@@ -107,8 +110,10 @@ async function main() {
   if (!APPLY) { log("rapor modu — hiçbir şey yazılmadı (--apply ile uygula)"); return; }
   let ok = 0;
   for (const b of bulgular) {
-    const { error: e } = await sb.from("dispatches").update({ conflict: b.conflict }).eq("id", b.row.id);
-    if (e) log("yazma hatası", b.row.slug, e.message); else ok++;
+    try {
+      await sql`update dispatches set conflict = ${b.conflict} where id = ${b.row.id}`;
+      ok++;
+    } catch (e) { log("yazma hatası", b.row.slug, e.message); }
   }
   log(`${ok}/${bulgular.length} tel etiketlendi`);
 }

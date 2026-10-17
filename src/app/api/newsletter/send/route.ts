@@ -1,4 +1,4 @@
-import { supabaseAdmin } from "@/lib/supabase";
+import { db } from "@/lib/db";
 import { getDispatches } from "@/lib/dispatches";
 import { SITE_URL } from "@/lib/seo";
 import type { Locale } from "@/lib/i18n";
@@ -42,8 +42,8 @@ export async function POST(req: Request) {
   if (!mailerConfigured()) return Response.json({ error: "mailer not configured" }, { status: 503 });
 
   try {
-    const sb = supabaseAdmin();
-    const { data: subs } = await sb.from("subscribers").select("email, locale").eq("active", true).limit(5000);
+    const sql = db();
+    const subs = await sql<{ email: string; locale: string }[]>`select email, locale from subscribers where active limit 5000`;
     if (!subs?.length) return Response.json({ ok: true, sent: 0, note: "no subscribers" });
 
     // Dil başına dispatch listesini bir kez çek (içerik alıcılar arasında ortak).

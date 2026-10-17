@@ -12,12 +12,11 @@
 // "United States" deseydik AI her haberini `abd` etiketlerdi — oysa Verge'ün
 // Samsung haberi ABD haberi değil. Ülke yalnız beat'i kendi ülkesi olan
 // ulusal yayınlara verilir.
-import { createClient } from "@supabase/supabase-js";
-import { loadEnv, requireEnv } from "./env.mjs";
+import { connect } from "./lib/db.mjs";
+import { loadEnv } from "./env.mjs";
 import { guessCountry } from "./sources-map.mjs";
 
 loadEnv();
-const [SUPABASE_URL, SERVICE_ROLE] = requireEnv("SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY");
 const DRY = process.argv.includes("--dry");
 const log = (...a) => console.log(new Date().toISOString(), ...a);
 
@@ -30,10 +29,12 @@ function hostOf(url) {
 }
 
 async function main() {
-  const sb = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
-  const { data, error } = await sb.from("sources").select("id,url,name,priority").is("country", null);
-  if (error) { log("okuma hatası", error.message); process.exit(1); }
-  if (!data?.length) { log("ülkesi boş kaynak yok"); return; }
+  const sql = connect();
+  let data;
+  try {
+    data = await sql`select id, url, name, priority from sources where country is null`;
+  } catch (e) { log("okuma hatası", e.message); process.exit(1); }
+  if (!data.length) { log("ülkesi boş kaynak yok"); return; }
   log(`ülkesi boş: ${data.length}`);
 
   const byCountry = {};
@@ -48,12 +49,13 @@ async function main() {
   }
   if (DRY) { log("--dry: yazılmadı"); return; }
 
-  // url/name da gönderilir: ON CONFLICT DO UPDATE'te bile Postgres geçerli bir
-  // satır kurmak zorunda, NOT NULL kolonlar eksikse insert'ten önce patlar.
-  for (let i = 0; i < updates.length; i += 200) {
-    const { error: e } = await sb.from("sources").upsert(updates.slice(i, i + 200), { onConflict: "id" });
-    if (e) { log("yazma hatası", e.message); process.exit(1); }
-  }
+  // Satırlar zaten var → toplu UPDATE ... FROM (VALUES).
+  try {
+    await sql`
+      update sources s set country = v.country
+        from (values ${sql(updates.map((u) => [u.id, u.country]))}) as v(id, country)
+       where s.id = v.id::bigint`;
+  } catch (e) { log("yazma hatası", e.message); process.exit(1); }
   log(`bitti. ${updates.length} kaynak güncellendi`);
 }
 

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { supabaseAdmin } from "@/lib/supabase";
+import { db } from "@/lib/db";
 import { ALL_SECTIONS } from "@/lib/site";
 import { SourceToggle } from "./SourceToggle";
 
@@ -37,29 +37,28 @@ export default async function AdminSourcesPage({
   const durum = sp.durum || "";
   const skip = Math.max(0, Number(sp.s) || 0);
 
-  const sb = supabaseAdmin();
-  let query = sb
-    .from("sources")
-    .select("id,url,name,section,region,lang,active,last_fetched_at,last_status,fail_count,item_count", { count: "exact" });
-
-  // PostgREST .or() filtre enjeksiyonuna karşı: ayraç karakterlerini temizle.
-  if (q) {
-    const safe = q.replace(/[(),%*:\\]/g, "");
-    if (safe) query = query.or(`name.ilike.%${safe}%,url.ilike.%${safe}%`);
-  }
-  if (section === "yok") query = query.is("section", null);
-  else if (section) query = query.eq("section", section.replace(/[^a-z-]/g, ""));
-  if (durum === "aktif") query = query.eq("active", true);
-  else if (durum === "kapali") query = query.eq("active", false);
-  else if (durum === "hatali") query = query.gt("fail_count", 0);
-
-  const { data, count } = await query
-    .order("fail_count", { ascending: false })
-    .order("id", { ascending: true })
-    .range(skip, skip + PAGE_SIZE - 1);
-
-  const rows = (data || []) as SourceRow[];
-  const total = count ?? 0;
+  const sql = db();
+  // Parametreli sorgu: enjeksiyon yok; yalnız LIKE jokerleri kaçırılıyor.
+  const pat = q ? `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%` : "";
+  const cleanSection = section.replace(/[^a-z-]/g, "");
+  const where = [
+    pat ? sql`(name ilike ${pat} or url ilike ${pat})` : sql`true`,
+    section === "yok" ? sql`section is null` : cleanSection ? sql`section = ${cleanSection}` : sql`true`,
+    durum === "aktif" ? sql`active` :
+    durum === "kapali" ? sql`not active` :
+    durum === "hatali" ? sql`fail_count > 0` : sql`true`,
+  ];
+  const rows = await sql<(SourceRow & { total: number })[]>`
+    select id, url, name, section, region, lang, active, last_fetched_at, last_status, fail_count, item_count,
+           count(*) over () as total
+      from sources
+     where ${where[0]} and ${where[1]} and ${where[2]}
+     order by fail_count desc, id asc
+     limit ${PAGE_SIZE} offset ${skip}`;
+  // Sayfa boşsa (taşan offset) toplamı ayrıca say; pencere fonksiyonu satırsız döner.
+  const total = rows[0]?.total ?? (skip > 0
+    ? (await sql<{ n: number }[]>`select count(*) as n from sources where ${where[0]} and ${where[1]} and ${where[2]}`)[0].n
+    : 0);
   const linkTo = (patch: Record<string, string>) => {
     const p = new URLSearchParams({ ...(q && { q }), ...(section && { section }), ...(durum && { durum }), ...patch });
     return `/admin/kaynaklar?${p.toString()}`;

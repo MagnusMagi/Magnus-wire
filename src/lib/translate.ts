@@ -1,4 +1,4 @@
-import { supabaseAdmin } from "@/lib/supabase";
+import { db } from "@/lib/db";
 import type { Locale } from "@/lib/i18n";
 
 // Gövde çevirisi TALEP ÜZERİNE.
@@ -75,15 +75,15 @@ async function callOpenAI(input: TranslateInput): Promise<Translated | null> {
 // korunur; yalnız body ve keyFacts eklenir.
 async function persist(slug: string, locale: Locale, t: Translated): Promise<void> {
   try {
-    const sb = supabaseAdmin();
-    const { data } = await sb.from("dispatches").select("content").eq("slug", slug).maybeSingle();
-    const content = (data?.content ?? {}) as Record<string, Record<string, unknown>>;
-    const next = {
-      ...content,
-      [locale]: { ...(content[locale] ?? {}), body: t.body, keyFacts: t.keyFacts },
-    };
-    const { error } = await sb.from("dispatches").update({ content: next }).eq("slug", slug);
-    if (error) console.error("translate: yazma hatası", error.message);
+    const sql = db();
+    // Oku-birleştir-yaz yerine tek atomik güncelleme: aynı anda iki dilin
+    // çevirisi yazılırsa biri diğerini ezmez.
+    const patch = { body: t.body, keyFacts: t.keyFacts };
+    await sql`
+      update dispatches
+         set content = coalesce(content, '{}'::jsonb)
+                      || jsonb_build_object(${locale}::text, coalesce(content -> ${locale}::text, '{}'::jsonb) || ${sql.json(patch)})
+       where slug = ${slug}`;
   } catch (e) {
     console.error("translate: yazma istisnası", e instanceof Error ? e.message : e);
   }

@@ -1,4 +1,4 @@
-import { supabaseServer } from "./supabase";
+import { db } from "./db";
 import { t, type Locale } from "./i18n";
 
 /** CC atfı için gereken alanlar; lisans şartı olduğu için görselle birlikte saklanır. */
@@ -62,41 +62,42 @@ function mapRow(r: Row, locale: Locale): Dispatch {
   };
 }
 
-const COLS = "slug,kicker,section,region,conflict,hero_credit,title,summary,body,tags,hero,live,author,published_at,source_url,source_name,content";
+const COLS = ["slug", "kicker", "section", "region", "conflict", "hero_credit", "title", "summary", "body", "tags", "hero", "live", "author", "published_at", "source_url", "source_name", "content"];
+
+/** Okuma hatası sayfayı düşürmesin: logla, boş dön (eski supabase davranışı). */
+async function rows(label: string, q: () => Promise<Row[]>): Promise<Row[]> {
+  try { return await q(); }
+  catch (e) { console.error(`${label}:`, e instanceof Error ? e.message : e); return []; }
+}
 
 export async function getDispatches(locale: Locale, limit = 60): Promise<Dispatch[]> {
-  const sb = supabaseServer();
-  const { data, error } = await sb.from("dispatches").select(COLS).order("published_at", { ascending: false }).limit(limit);
-  if (error) { console.error("getDispatches:", error.message); return []; }
-  return (data as Row[]).map((r) => mapRow(r, locale));
+  const sql = db();
+  const data = await rows("getDispatches", () => sql<Row[]>`select ${sql(COLS)} from dispatches order by published_at desc limit ${limit}`);
+  return data.map((r) => mapRow(r, locale));
 }
 
 export async function getDispatch(locale: Locale, slug: string): Promise<Dispatch | undefined> {
-  const sb = supabaseServer();
-  const { data, error } = await sb.from("dispatches").select(COLS).eq("slug", slug).maybeSingle();
-  if (error || !data) return undefined;
-  return mapRow(data as Row, locale);
+  const sql = db();
+  const [r] = await rows("getDispatch", () => sql<Row[]>`select ${sql(COLS)} from dispatches where slug = ${slug} limit 1`);
+  return r ? mapRow(r, locale) : undefined;
 }
 
 export async function dispatchesBySection(locale: Locale, section: string): Promise<Dispatch[]> {
-  const sb = supabaseServer();
-  const { data, error } = await sb.from("dispatches").select(COLS).eq("section", section).order("published_at", { ascending: false }).limit(60);
-  if (error || !data) return [];
-  return (data as Row[]).map((r) => mapRow(r, locale));
+  const sql = db();
+  const data = await rows("dispatchesBySection", () => sql<Row[]>`select ${sql(COLS)} from dispatches where section = ${section} order by published_at desc limit 60`);
+  return data.map((r) => mapRow(r, locale));
 }
 
 export async function dispatchesByRegion(locale: Locale, region: string): Promise<Dispatch[]> {
-  const sb = supabaseServer();
-  const { data, error } = await sb.from("dispatches").select(COLS).eq("region", region).order("published_at", { ascending: false }).limit(60);
-  if (error || !data) return [];
-  return (data as Row[]).map((r) => mapRow(r, locale));
+  const sql = db();
+  const data = await rows("dispatchesByRegion", () => sql<Row[]>`select ${sql(COLS)} from dispatches where region = ${region} order by published_at desc limit 60`);
+  return data.map((r) => mapRow(r, locale));
 }
 
 export async function dispatchesByConflict(locale: Locale, conflict: string, limit = 60): Promise<Dispatch[]> {
-  const sb = supabaseServer();
-  const { data, error } = await sb.from("dispatches").select(COLS).eq("conflict", conflict).order("published_at", { ascending: false }).limit(limit);
-  if (error || !data) return [];
-  return (data as Row[]).map((r) => mapRow(r, locale));
+  const sql = db();
+  const data = await rows("dispatchesByConflict", () => sql<Row[]>`select ${sql(COLS)} from dispatches where conflict = ${conflict} order by published_at desc limit ${limit}`);
+  return data.map((r) => mapRow(r, locale));
 }
 
 /**
@@ -105,12 +106,10 @@ export async function dispatchesByConflict(locale: Locale, conflict: string, lim
  * (bugün ~250) tek seferde rahatça okunuyor.
  */
 export async function conflictSummary(locale: Locale): Promise<Record<string, { count: number; latest: Dispatch | null }>> {
-  const sb = supabaseServer();
-  const { data, error } = await sb.from("dispatches").select(COLS)
-    .not("conflict", "is", null).order("published_at", { ascending: false }).limit(400);
-  if (error || !data) return {};
+  const sql = db();
+  const data = await rows("conflictSummary", () => sql<Row[]>`select ${sql(COLS)} from dispatches where conflict is not null order by published_at desc limit 400`);
   const out: Record<string, { count: number; latest: Dispatch | null }> = {};
-  for (const r of data as Row[]) {
+  for (const r of data) {
     const k = r.conflict as string;
     if (!out[k]) out[k] = { count: 0, latest: mapRow(r, locale) };  // sıralı geldiği için ilki en yenisi
     out[k].count++;
@@ -130,40 +129,39 @@ export function latestTs(list: Dispatch[]): number {
 }
 
 export async function searchDispatches(locale: Locale, opts: { q?: string; tag?: string }): Promise<Dispatch[]> {
-  const sb = supabaseServer();
-  let query = sb.from("dispatches").select(COLS).order("published_at", { ascending: false }).limit(60);
+  const sql = db();
   const tag = (opts.tag || "").toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 40);
-  const q = (opts.q || "").slice(0, 60).replace(/[(),%*:\\"]/g, " ").trim();
-  if (tag) query = query.contains("tags", [tag]);
-  // Değerleri çift tırnağa alıyoruz; q'dan virgül/parantez/tırnak vb. zaten temizlendi (PostgREST filtre enjeksiyon koruması).
-  else if (q) query = query.or(`title.ilike."%${q}%",summary.ilike."%${q}%",body.ilike."%${q}%"`);
-  else return [];
-  const { data, error } = await query;
-  if (error) { console.error("searchDispatches:", error.message); return []; }
-  return (data as Row[]).map((r) => mapRow(r, locale));
+  const q = (opts.q || "").slice(0, 60).trim();
+  let data: Row[];
+  if (tag) {
+    data = await rows("searchDispatches", () => sql<Row[]>`select ${sql(COLS)} from dispatches where tags @> ${[tag]}::text[] order by published_at desc limit 60`);
+  } else if (q) {
+    // Parametreli sorgu: enjeksiyon yok; yalnız LIKE jokerlerini kaçırıyoruz.
+    const pat = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    data = await rows("searchDispatches", () => sql<Row[]>`select ${sql(COLS)} from dispatches where title ilike ${pat} or summary ilike ${pat} or body ilike ${pat} order by published_at desc limit 60`);
+  } else return [];
+  return data.map((r) => mapRow(r, locale));
 }
 
 export async function getMostRead(locale: Locale, limit = 5): Promise<Dispatch[]> {
-  const sb = supabaseServer();
-  const { data, error } = await sb.from("dispatches").select(COLS).order("views", { ascending: false }).order("published_at", { ascending: false }).limit(limit);
-  if (error || !data) { if (error) console.error("getMostRead:", error.message); return []; }
-  return (data as Row[]).map((r) => mapRow(r, locale));
+  const sql = db();
+  const data = await rows("getMostRead", () => sql<Row[]>`select ${sql(COLS)} from dispatches order by views desc, published_at desc limit ${limit}`);
+  return data.map((r) => mapRow(r, locale));
 }
 
 export async function getTrendingTags(limit = 60): Promise<{ tag: string; count: number }[]> {
-  const sb = supabaseServer();
-  const { data, error } = await sb.from("dispatches").select("tags").limit(500);
-  if (error || !data) return [];
+  const sql = db();
+  // Eski davranış: sırasız 500 satırın etiketleri. Sırayı en yeni tellere sabitledik.
+  const data = (await rows("getTrendingTags", () => sql<Row[]>`select tags from dispatches order by published_at desc limit 500`)) as unknown as { tags: string[] | null }[];
   const counts = new Map<string, number>();
-  for (const r of data as { tags: string[] | null }[]) for (const tg of r.tags || []) counts.set(tg, (counts.get(tg) || 0) + 1);
+  for (const r of data) for (const tg of r.tags || []) counts.set(tg, (counts.get(tg) || 0) + 1);
   return [...counts.entries()].map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count).slice(0, limit);
 }
 
 export async function dispatchesBySourceHost(locale: Locale, host: string, limit = 60): Promise<Dispatch[]> {
-  const sb = supabaseServer();
+  const sql = db();
   const clean = host.toLowerCase().replace(/[^a-z0-9.-]/g, "");
   if (!clean) return [];
-  const { data, error } = await sb.from("dispatches").select(COLS).ilike("source_url", `%${clean}%`).order("published_at", { ascending: false }).limit(limit);
-  if (error || !data) return [];
-  return (data as Row[]).map((r) => mapRow(r, locale));
+  const data = await rows("dispatchesBySourceHost", () => sql<Row[]>`select ${sql(COLS)} from dispatches where source_url ilike ${`%${clean}%`} order by published_at desc limit ${limit}`);
+  return data.map((r) => mapRow(r, locale));
 }

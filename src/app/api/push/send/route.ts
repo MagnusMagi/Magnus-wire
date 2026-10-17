@@ -1,5 +1,5 @@
 import webpush from "web-push";
-import { supabaseAdmin } from "@/lib/supabase";
+import { db } from "@/lib/db";
 import { getDispatches } from "@/lib/dispatches";
 import { SITE_URL } from "@/lib/seo";
 import type { Locale } from "@/lib/i18n";
@@ -45,8 +45,8 @@ export async function POST(req: Request) {
   }
   const payload = JSON.stringify({ title, body: bodyText, url: url || SITE_URL, tag: "wire-breaking" });
 
-  const sb = supabaseAdmin();
-  const { data: subs } = await sb.from("push_subscriptions").select("endpoint, p256dh, auth").limit(5000);
+  const sql = db();
+  const subs = await sql<{ endpoint: string; p256dh: string; auth: string }[]>`select endpoint, p256dh, auth from push_subscriptions limit 5000`;
   if (!subs?.length) return Response.json({ ok: true, sent: 0, note: "no subscribers" });
 
   let sent = 0;
@@ -60,6 +60,6 @@ export async function POST(req: Request) {
       if (code === 404 || code === 410) stale.push(s.endpoint);
     }
   }));
-  if (stale.length) await sb.from("push_subscriptions").delete().in("endpoint", stale);
+  if (stale.length) await sql`delete from push_subscriptions where endpoint in ${sql(stale)}`;
   return Response.json({ ok: true, sent, pruned: stale.length });
 }

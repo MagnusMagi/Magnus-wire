@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase";
+import { db } from "@/lib/db";
 import { SITE_URL } from "@/lib/seo";
 import { verifyToken } from "@/lib/subtoken";
 
@@ -22,9 +22,8 @@ export async function GET(req: NextRequest) {
   const email = verifyToken(token, "confirm");
   if (!email) return page("Bağlantı geçersiz / Invalid link", "Onay bağlantısı geçersiz veya süresi dolmuş. · This confirmation link is invalid.", "MagiWire →", `${SITE_URL}/`);
   try {
-    const sb = supabaseAdmin();
-    const { error } = await sb.from("subscribers").update({ active: true }).eq("email", email);
-    if (error) throw error;
+    const sql = db();
+    await sql`update subscribers set active = true where email = ${email}`;
   } catch {
     return page("Bir hata oldu / Error", "Onaylanamadı, lütfen tekrar dene. · Could not confirm, please try again.", "MagiWire →", `${SITE_URL}/`);
   }

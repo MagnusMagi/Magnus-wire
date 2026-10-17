@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { ADMIN_COOKIE, verifySessionToken } from "@/lib/adminAuth";
-import { supabaseAdmin } from "@/lib/supabase";
+import { db } from "@/lib/db";
 import { fetchTweet, fetchFullText, tweetIdFromUrl } from "@/lib/xSyndication.mjs";
 
 export const runtime = "nodejs";
@@ -51,18 +51,14 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const sb = supabaseAdmin();
-  const { error } = await sb.from("tweets").upsert(
-    {
-      ...tw,
-      found_via: "manual",
-      active: true,
-      fail_count: 0,
-      refreshed_at: new Date().toISOString(),
-    },
-    { onConflict: "id" },
-  );
-  if (error) return NextResponse.json({ error: "kaydedilemedi" }, { status: 500 });
+  const sql = db();
+  const row = { ...tw, found_via: "manual", active: true, fail_count: 0, refreshed_at: new Date().toISOString() };
+  const { id: _id, ...rest } = row;
+  try {
+    await sql`insert into tweets ${sql(row)} on conflict (id) do update set ${sql(rest)}`;
+  } catch {
+    return NextResponse.json({ error: "kaydedilemedi" }, { status: 500 });
+  }
   return NextResponse.json({ ok: true, id: tw.id, screen_name: tw.screen_name, lang: tw.lang });
 }
 
@@ -83,9 +79,12 @@ export async function PATCH(req: NextRequest) {
   if (typeof body?.pinned === "boolean") patch.pinned = body.pinned;
   if (!Object.keys(patch).length) return NextResponse.json({ error: "değişiklik yok" }, { status: 400 });
 
-  const sb = supabaseAdmin();
-  const { error } = await sb.from("tweets").update(patch).eq("id", id);
-  if (error) return NextResponse.json({ error: "update failed" }, { status: 500 });
+  const sql = db();
+  try {
+    await sql`update tweets set ${sql(patch)} where id = ${id}`;
+  } catch {
+    return NextResponse.json({ error: "update failed" }, { status: 500 });
+  }
   return NextResponse.json({ ok: true });
 }
 
@@ -95,8 +94,11 @@ export async function DELETE(req: NextRequest) {
   const id = typeof body?.id === "string" ? body.id : "";
   if (!/^\d{10,25}$/.test(id)) return NextResponse.json({ error: "invalid id" }, { status: 400 });
 
-  const sb = supabaseAdmin();
-  const { error } = await sb.from("tweets").delete().eq("id", id);
-  if (error) return NextResponse.json({ error: "delete failed" }, { status: 500 });
+  const sql = db();
+  try {
+    await sql`delete from tweets where id = ${id}`;
+  } catch {
+    return NextResponse.json({ error: "delete failed" }, { status: 500 });
+  }
   return NextResponse.json({ ok: true });
 }

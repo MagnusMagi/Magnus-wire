@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase";
+import { db } from "@/lib/db";
 import { SITE_URL } from "@/lib/seo";
 import { verifyToken } from "@/lib/subtoken";
 
@@ -19,9 +19,9 @@ function page(title: string, body: string, cta: string, href: string): Response 
 
 async function unsubscribe(email: string): Promise<boolean> {
   try {
-    const sb = supabaseAdmin();
-    const { error } = await sb.from("subscribers").update({ active: false }).eq("email", email);
-    return !error;
+    const sql = db();
+    await sql`update subscribers set active = false where email = ${email}`;
+    return true;
   } catch {
     return false;
   }

@@ -19,12 +19,11 @@
 // verir; arama/trend/profil akışı uçları 404. Yani "hangi tweet" sorusunun
 // ücretsiz cevabı, tweet'i zaten bizim için seçmiş olan gazetecilerdir.
 import Parser from "rss-parser";
-import { createClient } from "@supabase/supabase-js";
-import { loadEnv, requireEnv } from "./env.mjs";
+import { connect, excludedSet, updateKeys } from "./lib/db.mjs";
+import { loadEnv } from "./env.mjs";
 import { fetchTweet, fetchTweetRaw, normalizeTweet, quotedTweetOf, extractTweetIds, tweetIdTime, fetchFullText } from "../src/lib/xSyndication.mjs";
 
 loadEnv();
-const [SUPABASE_URL, SERVICE_ROLE] = requireEnv("SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY");
 
 // Koşu başına taranacak besleme sayısı. Rotasyon KENDİ damgamızla
 // (sources.x_scanned_at) yürür — ingest.mjs'in last_fetched_at rotasyonuna
@@ -107,7 +106,7 @@ const ARTICLE_TIMEOUT_MS = Number(process.env.XI_ARTICLE_TIMEOUT_MS || 12000);
 const UA_BROWSER =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
 
-const sb = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
+const sql = connect();
 const log = (...a) => console.log(new Date().toISOString(), "[x]", ...a);
 
 /** Basit eşzamanlılık havuzu — sıralı fetch cron aralığını yiyor. */
@@ -156,21 +155,17 @@ async function fetchArticleHtml(url) {
  */
 async function scanFeeds() {
   // İki şerit: üretkenler (her koşu) + keşif rotasyonu (FIFO).
+  const cols = sql(["id", "url", "name", "section", "lang", "country", "x_found_count"]);
   const [prod, disc] = await Promise.all([
-    sb.from("sources").select("id,url,name,section,lang,country,x_found_count")
-      .eq("active", true).gt("x_found_count", 0)
-      .order("x_found_count", { ascending: false })
-      .limit(XI_PRODUCTIVE_PER_RUN),
-    sb.from("sources").select("id,url,name,section,lang,country,x_found_count")
-      .eq("active", true).eq("x_found_count", 0)
-      .order("x_scanned_at", { ascending: true, nullsFirst: true })
-      .limit(XI_FEEDS_PER_RUN),
-  ]);
-  if (prod.error || disc.error) throw new Error(`kaynak okuma: ${(prod.error || disc.error).message}`);
+    sql`select ${cols} from sources where active and x_found_count > 0
+         order by x_found_count desc limit ${XI_PRODUCTIVE_PER_RUN}`,
+    sql`select ${cols} from sources where active and x_found_count = 0
+         order by x_scanned_at asc nulls first limit ${XI_FEEDS_PER_RUN}`,
+  ]).catch((e) => { throw new Error(`kaynak okuma: ${e.message}`); });
 
   // Aynı kaynak iki şeritte olamaz (biri >0, diğeri =0 filtresi) ama yine de
   // kimliğe göre tekilleştiriliyor: filtreler ileride değişebilir.
-  const feeds = [...new Map([...(prod.data ?? []), ...(disc.data ?? [])].map((f) => [f.id, f])).values()];
+  const feeds = [...new Map([...prod, ...disc].map((f) => [f.id, f])).values()];
   if (!feeds.length) return { feeds: 0, ok: 0, items: 0, productive: 0, found: new Map() };
 
   const parser = new Parser({
@@ -220,16 +215,17 @@ async function scanFeeds() {
   // Rotasyon damgası: besleme çekilemese de ilerletilir, yoksa ölü bir feed
   // kuyruğun başında takılıp havuzun devrini kilitler.
   const stamp = new Date().toISOString();
-  const { error: e2 } = await sb.from("sources").update({ x_scanned_at: stamp }).in("id", feeds.map((f) => f.id));
-  if (e2) log("rotasyon damgası hatası:", e2.message);
+  try {
+    await sql`update sources set x_scanned_at = ${stamp} where id in ${sql(feeds.map((f) => f.id))}`;
+  } catch (e) { log("rotasyon damgası hatası:", e.message); }
 
   // Üretkenlik sayacı: bir kaynak tweet ürettiyse bir daha rotasyonu beklemesin.
   for (const [id, hits] of perFeed) {
     const prev = feeds.find((f) => f.id === id)?.x_found_count ?? 0;
-    await sb.from("sources").update({ x_found_count: prev + hits }).eq("id", id);
+    await sql`update sources set x_found_count = ${prev + hits} where id = ${id}`;
   }
 
-  return { feeds: feeds.length, ok, items, productive: prod.data?.length ?? 0, found };
+  return { feeds: feeds.length, ok, items, productive: prod.length, found };
 }
 
 /**
@@ -241,14 +237,11 @@ async function scanFeeds() {
  * Sicil (`x_article_scans`) aynı makalenin tekrar indirilmesini engeller.
  */
 async function scanXSources() {
-  const { data: srcs, error } = await sb
-    .from("x_sources")
-    .select("id,url,name,lang,found_count")
-    .eq("active", true)
-    .order("last_scanned_at", { ascending: true, nullsFirst: true })
-    .limit(XSRC_PER_RUN);
-  if (error) throw new Error(`x_sources okuma: ${error.message}`);
-  if (!srcs?.length) return { sources: 0, articles: 0, found: new Map() };
+  const srcs = await sql`
+    select id, url, name, lang, found_count from x_sources where active
+     order by last_scanned_at asc nulls first limit ${XSRC_PER_RUN}`
+    .catch((e) => { throw new Error(`x_sources okuma: ${e.message}`); });
+  if (!srcs.length) return { sources: 0, articles: 0, found: new Map() };
 
   const parser = new Parser({ timeout: FEED_TIMEOUT_MS, headers: { "User-Agent": UA_BROWSER } });
   const found = new Map();
@@ -260,11 +253,11 @@ async function scanXSources() {
     try {
       parsed = await parser.parseURL(s.url);
     } catch (e) {
-      await sb.from("x_sources").update({
+      await sql`update x_sources set ${sql({
         last_scanned_at: new Date().toISOString(),
         last_status: String(e.message).slice(0, 120),
         fail_count: (s.fail_count ?? 0) + 1,
-      }).eq("id", s.id);
+      })} where id = ${s.id}`;
       return;
     }
     for (const it of (parsed.items ?? []).slice(0, XSRC_ITEMS_PER_SOURCE)) {
@@ -277,20 +270,20 @@ async function scanXSources() {
       // 2) Makale adayı.
       if (it.link) candidates.push({ url: it.link, name: s.name, sourceId: s.id });
     }
-    await sb.from("x_sources").update({
+    await sql`update x_sources set ${sql({
       last_scanned_at: new Date().toISOString(),
       last_status: "ok",
       fail_count: 0,
       item_count: (parsed.items ?? []).length,
-    }).eq("id", s.id);
+    })} where id = ${s.id}`;
   });
 
   // Sicilde olanları ele; kalanlardan bütçe kadarını çek.
   const urls = [...new Set(candidates.map((c) => c.url))];
   const seen = new Set();
-  for (let i = 0; i < urls.length; i += 100) {
-    const { data } = await sb.from("x_article_scans").select("url").in("url", urls.slice(i, i + 100));
-    (data ?? []).forEach((r) => seen.add(r.url));
+  if (urls.length) {
+    const data = await sql`select url from x_article_scans where url in ${sql(urls)}`;
+    data.forEach((r) => seen.add(r.url));
   }
   const todo = candidates.filter((c) => !seen.has(c.url)).slice(0, XSRC_ARTICLES_PER_RUN);
 
@@ -312,12 +305,13 @@ async function scanXSources() {
   });
 
   if (scanRows.length) {
-    const { error: e } = await sb.from("x_article_scans").upsert(scanRows, { onConflict: "url" });
-    if (e) log("makale sicili hatası:", e.message);
+    try {
+      await sql`insert into x_article_scans ${sql(scanRows)} on conflict (url) do update set ${excludedSet(sql, ["found_count"])}`;
+    } catch (e) { log("makale sicili hatası:", e.message); }
   }
   for (const [id, hits] of perSource) {
     const prev = srcs.find((x) => x.id === id)?.found_count ?? 0;
-    await sb.from("x_sources").update({ found_count: prev + hits }).eq("id", id);
+    await sql`update x_sources set found_count = ${prev + hits} where id = ${id}`;
   }
 
   return { sources: srcs.length, articles: todo.length, found };
@@ -325,21 +319,17 @@ async function scanXSources() {
 
 async function discover() {
   const since = new Date(Date.now() - SCAN_MAX_AGE_DAYS * 86400000).toISOString();
-  const { data: cands, error } = await sb
-    .from("dispatches")
-    .select("id,slug,source_url,source_name,section,published_at")
-    .gte("published_at", since)
-    .not("source_url", "is", null)
-    .order("published_at", { ascending: false })
-    .limit(120);
-  if (error) throw new Error(`dispatch okuma: ${error.message}`);
-
-  // Taranmışları ele. PostgREST'te NOT IN alt sorgusu yok; kimlikler zaten
-  // küçük bir küme olduğu için istemcide kesiştiriliyor.
-  const ids = (cands ?? []).map((d) => d.id);
-  const { data: scanned } = await sb.from("tweet_scans").select("dispatch_id").in("dispatch_id", ids);
-  const seen = new Set((scanned ?? []).map((r) => r.dispatch_id));
-  const todo = (cands ?? []).filter((d) => !seen.has(d.id)).slice(0, SCAN_PER_RUN);
+  // Taranmışlar sorguda elenir (eskiden PostgREST'te NOT EXISTS olmadığı için
+  // istemcide kesiştiriliyordu). Pencere aynı: en yeni 120 tel.
+  const todo = await sql`
+    select d.id, d.slug, d.source_url, d.source_name, d.section, d.published_at
+      from (select * from dispatches
+             where published_at >= ${since} and source_url is not null
+             order by published_at desc limit 120) d
+     where not exists (select 1 from tweet_scans s where s.dispatch_id = d.id)
+     order by d.published_at desc
+     limit ${SCAN_PER_RUN}`
+    .catch((e) => { throw new Error(`dispatch okuma: ${e.message}`); });
   if (!todo.length) return { scanned: 0, failed: 0, found: new Map() };
 
   // id → ilk bulan dispatch (kaynak izi). Aynı tweet iki haberde geçerse ilki kalır.
@@ -365,8 +355,9 @@ async function discover() {
   });
 
   if (scanRows.length) {
-    const { error: e } = await sb.from("tweet_scans").upsert(scanRows, { onConflict: "dispatch_id" });
-    if (e) log("tarama kaydı hatası:", e.message);
+    try {
+      await sql`insert into tweet_scans ${sql(scanRows)} on conflict (dispatch_id) do update set ${excludedSet(sql, ["found_count"])}`;
+    } catch (e) { log("tarama kaydı hatası:", e.message); }
   }
   return { scanned: todo.length, failed, found };
 }
@@ -400,26 +391,24 @@ async function resolveNew(found) {
     ...rest.slice(0, RESOLVE_EXPLORE),
   ];
 
-  // ⚠️⚠️ Bilinen ID elemesi PARÇALI ve HATA KONTROLLÜ yapılmak ZORUNDA.
-  // Önceki sürüm tüm aday listesini tek `.in()` sorgusuna koyuyordu; PostgREST
-  // "URI too long" döndürüyor, hata kontrol edilmediği için `data` null geliyor
-  // ve eleme kümesi BOŞ kalıyordu. Sonuç sessiz ve pahalı: her koşuda 40 slotun
-  // tamamı ZATEN havuzda olan tweet'leri yeniden çekmeye gidiyordu ("eklenen 15"
-  // yazıp havuzun 60'ta sabit kalması bu yüzdendi). Ayrıca PostgREST tek
-  // istekte en fazla 1000 satır döndürür — parça boyu bunun çok altında.
+  // ⚠️⚠️ Bilinen ID elemesi HATA KONTROLLÜ yapılmak ZORUNDA. Eski PostgREST
+  // sürümünde hata kontrol edilmediği için eleme kümesi sessizce BOŞ kalıyor
+  // ve her koşuda 40 slotun tamamı ZATEN havuzda olan tweet'leri yeniden
+  // çekmeye gidiyordu ("eklenen 15" yazıp havuzun 60'ta sabit kalması).
   const CHECK_HEAD = Math.min(ordered.length, RESOLVE_PER_RUN * 10);
   const head = ordered.slice(0, CHECK_HEAD);
   const skip = new Set();
-  for (const table of ["tweets", "tweet_rejects"]) {
-    for (let i = 0; i < head.length; i += 200) {
-      const { data, error } = await sb.from(table).select("id").in("id", head.slice(i, i + 200));
-      if (error) {
-        // Elemeyi yapamadıysak DURMAK doğrusu: eleme kümesi eksikken devam
-        // etmek bütçeyi bilinen tweet'lere harcamak demek.
-        log(`eleme sorgusu hatası (${table}): ${error.message}`);
-        return { added: 0, quoted: 0, rejected: 0, recovered: 0, fromXsrc: 0 };
-      }
-      data.forEach((r) => skip.add(r.id));
+  if (head.length) {
+    try {
+      const known = await sql`
+        select id from tweets where id in ${sql(head)}
+        union select id from tweet_rejects where id in ${sql(head)}`;
+      known.forEach((r) => skip.add(r.id));
+    } catch (e) {
+      // Elemeyi yapamadıysak DURMAK doğrusu: eleme kümesi eksikken devam
+      // etmek bütçeyi bilinen tweet'lere harcamak demek.
+      log(`eleme sorgusu hatası: ${e.message}`);
+      return { added: 0, quoted: 0, rejected: 0, recovered: 0, fromXsrc: 0 };
     }
   }
 
@@ -506,17 +495,19 @@ async function resolveNew(found) {
   });
 
   if (rejects.length) {
-    const { error } = await sb.from("tweet_rejects").upsert(rejects, { onConflict: "id" });
-    if (error) log("sicil hatası:", error.message);
+    try {
+      await sql`insert into tweet_rejects ${sql(rejects)} on conflict (id) do update set ${excludedSet(sql, ["reason"])}`;
+    } catch (e) { log("sicil hatası:", e.message); }
   }
   if (!rows.length) return { added: 0, quoted: 0, rejected: rejects.length, recovered, fromXsrc };
 
   // Aynı koşuda hem doğrudan hem alıntı olarak gelen ID tekrarlanabilir;
-  // upsert'e çift anahtar vermek PostgREST'te hata döndürür.
+  // tek INSERT ... ON CONFLICT aynı satıra iki kez dokunamaz.
   const uniq = [...new Map(rows.map((r) => [r.id, r])).values()];
-  const { error } = await sb.from("tweets").upsert(uniq, { onConflict: "id" });
-  if (error) {
-    log("ekleme hatası:", error.message);
+  try {
+    await sql`insert into tweets ${sql(uniq)} on conflict (id) do update set ${excludedSet(sql, updateKeys(uniq, "id"))}`;
+  } catch (e) {
+    log("ekleme hatası:", e.message);
     return { added: 0, quoted: 0, rejected: rejects.length, recovered, fromXsrc };
   }
   return { added: uniq.length, quoted, rejected: rejects.length, recovered, fromXsrc };
@@ -533,15 +524,15 @@ async function refresh() {
   const coldSince = new Date(Date.now() - REFRESH_MAX_AGE_DAYS * 86400000).toISOString();
 
   const [hot, cold] = await Promise.all([
-    sb.from("tweets").select("id,fail_count,text,truncated").eq("active", true)
-      .gte("posted_at", hotSince)
-      .order("refreshed_at", { ascending: true, nullsFirst: true }).limit(hotBudget),
-    sb.from("tweets").select("id,fail_count,text,truncated").eq("active", true)
-      .gte("posted_at", coldSince).lt("posted_at", hotSince)
-      .order("refreshed_at", { ascending: true, nullsFirst: true }).limit(coldBudget),
+    sql`select id, fail_count, text, truncated from tweets
+         where active and posted_at >= ${hotSince}
+         order by refreshed_at asc nulls first limit ${hotBudget}`,
+    sql`select id, fail_count, text, truncated from tweets
+         where active and posted_at >= ${coldSince} and posted_at < ${hotSince}
+         order by refreshed_at asc nulls first limit ${coldBudget}`,
   ]);
 
-  const list = [...(hot.data ?? []), ...(cold.data ?? [])];
+  const list = [...hot, ...cold];
   if (!list.length) return { updated: 0, closed: 0, refreshRecovered: 0 };
 
   let updated = 0;
@@ -559,7 +550,7 @@ async function refresh() {
         ? { fail_count: fails, active: false, refreshed_at: now }
         : { fail_count: fails, refreshed_at: now };
       if (fails >= FAIL_LIMIT) closed++;
-      await sb.from("tweets").update(patch).eq("id", row.id);
+      await sql`update tweets set ${sql(patch)} where id = ${row.id}`;
       return;
     }
     // ⚠️ KURTARILMIŞ TAM METNİN ÜZERİNE YAZMA. Tazeleme syndication'dan
@@ -577,7 +568,7 @@ async function refresh() {
       }
     }
     const keepLonger = t.truncated && row.text && row.text.length > t.text.length;
-    await sb.from("tweets").update({
+    await sql`update tweets set ${sql({
       favorite_count: t.favorite_count,
       reply_count: t.reply_count,
       text: keepLonger ? row.text : t.text,
@@ -589,7 +580,7 @@ async function refresh() {
       photos: t.photos,
       fail_count: 0,
       refreshed_at: now,
-    }).eq("id", row.id);
+    })} where id = ${row.id}`;
     updated++;
   });
   return { updated, closed, refreshRecovered };
@@ -599,56 +590,38 @@ async function prune() {
   let deleted = 0;
   const del = async (ids) => {
     if (!ids.length) return;
-    for (let i = 0; i < ids.length; i += 100) {
-      const { error } = await sb.from("tweets").delete().in("id", ids.slice(i, i + 100));
-      if (!error) deleted += Math.min(100, ids.length - i);
-    }
+    try {
+      deleted += (await sql`delete from tweets where id in ${sql(ids)}`).count;
+    } catch (e) { log("budama hatası:", e.message); }
   };
 
   // 1) Yaş tavanı. Sabitlenmiş tweet editör kararıdır — budama onu ATLAR.
   const cutoff = new Date(Date.now() - KEEP_DAYS * 86400000).toISOString();
-  const { data: old } = await sb.from("tweets").select("id").eq("pinned", false).lt("posted_at", cutoff).limit(500);
-  await del((old ?? []).map((r) => r.id));
+  const old = await sql`select id from tweets where not pinned and posted_at < ${cutoff} limit 500`;
+  await del(old.map((r) => r.id));
 
   // 2) Dil başına kota. Yalnız GRACE_HOURS'tan eski satırlar yarışır; genç
   //    teller henüz etkileşim topladığı için dokunulmaz.
   const grace = new Date(Date.now() - GRACE_HOURS * 3600000).toISOString();
-  const { data: langRows } = await sb.from("tweets").select("lang").eq("pinned", false).lt("posted_at", grace);
-  const langs = [...new Set((langRows ?? []).map((r) => r.lang))];
-  for (const lang of langs) {
-    const { data: keepers } = await sb
-      .from("tweets")
-      .select("id")
-      .eq("lang", lang)
-      .eq("pinned", false)
-      .lt("posted_at", grace)
-      // Kota içinde kalanlar: o dilin EN ÇOK ETKİLEŞİM ALANLARI. Sıralama
-      // burada sönümsüz (ham beğeni) — arşiv derinliği için "o gün ne popülerdi"
-      // sorusunun cevabı, sayfadaki anlık sıralama değil.
-      .order("favorite_count", { ascending: false })
-      .limit(KEEP_PER_LANG);
-    const keep = new Set((keepers ?? []).map((r) => r.id));
-    const { data: all } = await sb
-      .from("tweets")
-      .select("id")
-      .eq("lang", lang)
-      .eq("pinned", false)
-      .lt("posted_at", grace)
-      .limit(2000);
-    await del((all ?? []).map((r) => r.id).filter((id) => !keep.has(id)));
+  const langRows = await sql`select distinct lang from tweets where not pinned and posted_at < ${grace}`;
+  for (const { lang } of langRows) {
+    // Kota içinde kalanlar: o dilin EN ÇOK ETKİLEŞİM ALANLARI. Sıralama
+    // burada sönümsüz (ham beğeni) — arşiv derinliği için "o gün ne popülerdi"
+    // sorusunun cevabı, sayfadaki anlık sıralama değil.
+    const keepers = await sql`
+      select id from tweets where lang = ${lang} and not pinned and posted_at < ${grace}
+       order by favorite_count desc limit ${KEEP_PER_LANG}`;
+    const keep = new Set(keepers.map((r) => r.id));
+    const all = await sql`select id from tweets where lang = ${lang} and not pinned and posted_at < ${grace} limit 2000`;
+    await del(all.map((r) => r.id).filter((id) => !keep.has(id)));
   }
 
   // 3) Global emniyet supabı. Dil kotalarının TOPLAMININ üstünde tutulmalı,
   //    yoksa emniyet supabı asıl kural haline gelir ve dil dengesini bozar.
-  const { count } = await sb.from("tweets").select("*", { count: "exact", head: true });
-  if ((count ?? 0) > KEEP) {
-    const { data: extra } = await sb
-      .from("tweets")
-      .select("id")
-      .eq("pinned", false)
-      .order("posted_at", { ascending: true })
-      .limit((count ?? 0) - KEEP);
-    await del((extra ?? []).map((r) => r.id));
+  const [{ count }] = await sql`select count(*) as count from tweets`;
+  if (count > KEEP) {
+    const extra = await sql`select id from tweets where not pinned order by posted_at asc limit ${count - KEEP}`;
+    await del(extra.map((r) => r.id));
   }
   return deleted;
 }
@@ -667,7 +640,8 @@ async function main() {
 
   if (process.env.REVALIDATE_SECRET) {
     try {
-      const r = await fetch("http://127.0.0.1:3360/api/revalidate", {
+      // Site artık Vercel'de: REVALIDATE_URL tam adres (https://.../api/revalidate).
+      const r = await fetch(process.env.REVALIDATE_URL || "http://127.0.0.1:3360/api/revalidate", {
         method: "POST",
         headers: { "x-revalidate-secret": process.env.REVALIDATE_SECRET },
       });
@@ -682,6 +656,7 @@ async function main() {
     `özet: feed ${feed.ok}/${feed.feeds} (üretken ${feed.productive}, ${feed.items} öğe) + makale ${article.scanned} (${article.failed} erişilemedi) + X-kaynak ${xsrc.sources}/${xsrc.articles} ` +
       `→ ${found.size} link, eklenen ${added} (X-kaynak ${fromXsrc}, alıntı ${quoted}), tam metin ${recovered + refreshRecovered}, elenen ${rejected}, tazelenen ${updated}, kapatılan ${closed}, budanan ${deleted}`,
   );
+  await sql.end({ timeout: 5 });
 }
 
 // ⚠️ Açıkça exit ŞART. Eşzamanlı fetch sonrası keep-alive soketleri event

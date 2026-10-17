@@ -1,25 +1,21 @@
 import Link from "next/link";
-import { supabaseAdmin } from "@/lib/supabase";
+import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 async function sourceCounts() {
-  const sb = supabaseAdmin();
-  const [all, active, failing] = await Promise.all([
-    sb.from("sources").select("*", { count: "exact", head: true }),
-    sb.from("sources").select("*", { count: "exact", head: true }).eq("active", true),
-    sb.from("sources").select("*", { count: "exact", head: true }).gt("fail_count", 0),
-  ]);
-  return { total: all.count ?? 0, active: active.count ?? 0, failing: failing.count ?? 0 };
+  const sql = db();
+  const [r] = await sql<{ total: number; active: number; failing: number }[]>`
+    select count(*) as total, count(*) filter (where active) as active, count(*) filter (where fail_count > 0) as failing
+      from sources`;
+  return r;
 }
 
 async function tweetCounts() {
-  const sb = supabaseAdmin();
-  const [all, shown] = await Promise.all([
-    sb.from("tweets").select("*", { count: "exact", head: true }),
-    sb.from("tweets").select("*", { count: "exact", head: true }).eq("active", true),
-  ]);
-  return { total: all.count ?? 0, shown: shown.count ?? 0 };
+  const sql = db();
+  const [r] = await sql<{ total: number; shown: number }[]>`
+    select count(*) as total, count(*) filter (where active) as shown from tweets`;
+  return r;
 }
 
 export default async function AdminHomePage() {

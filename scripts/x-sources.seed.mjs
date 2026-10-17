@@ -28,15 +28,17 @@ export const X_SOURCE_SEED = [
 
 // Tekrar koşturulabilir: node scripts/x-sources.seed.mjs
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const { loadEnv, requireEnv } = await import("./env.mjs");
-  const { createClient } = await import("@supabase/supabase-js");
+  const { loadEnv } = await import("./env.mjs");
+  const { connect, excludedSet, updateKeys } = await import("./lib/db.mjs");
   loadEnv();
-  const [url, key] = requireEnv("SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY");
-  const sb = createClient(url, key, { auth: { persistSession: false } });
+  const sql = connect();
   // ⚠️ Yalnız kimlik alanları yazılır: found_count/last_scanned_at gibi
   // çalışma verisi upsert'te SIFIRLANMAMALI.
   const rows = X_SOURCE_SEED.map((s) => ({ url: s.url, name: s.name, lang: s.lang, country: s.country }));
-  const { error } = await sb.from("x_sources").upsert(rows, { onConflict: "url" });
+  let error = null;
+  try {
+    await sql`insert into x_sources ${sql(rows)} on conflict (url) do update set ${excludedSet(sql, updateKeys(rows, "url"))}`;
+  } catch (e) { error = e; }
   console.log(error ? `HATA: ${error.message}` : `${rows.length} X kaynağı yazıldı`);
   process.exit(error ? 1 : 0);
 }

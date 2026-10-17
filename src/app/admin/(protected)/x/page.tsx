@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { supabaseAdmin } from "@/lib/supabase";
+import { db } from "@/lib/db";
 import { AddTweet, TweetActions } from "./TweetActions";
 
 export const dynamic = "force-dynamic";
@@ -35,32 +35,28 @@ export default async function AdminTweetsPage({
   const durum = sp.durum || "";
   const skip = Math.max(0, Number(sp.s) || 0);
 
-  const sb = supabaseAdmin();
-  let query = sb
-    .from("tweets")
-    .select(
-      "id,screen_name,author_name,text,lang,favorite_count,reply_count,posted_at,found_via,source_name,active,pinned,fail_count",
-      { count: "exact" },
-    );
-
-  // ⚠️ PostgREST .or() ayraç enjeksiyonu: filtre karakterleri temizlenmeli
-  // (kaynaklar sayfasıyla aynı önlem).
-  if (q) {
-    const safe = q.replace(/[(),%*:\\]/g, "");
-    if (safe) query = query.or(`screen_name.ilike.%${safe}%,author_name.ilike.%${safe}%,text.ilike.%${safe}%`);
-  }
-  if (dil) query = query.eq("lang", dil);
-  if (durum === "acik") query = query.eq("active", true);
-  else if (durum === "gizli") query = query.eq("active", false);
-  else if (durum === "elle") query = query.eq("found_via", "manual");
-  else if (durum === "sabit") query = query.eq("pinned", true);
-
-  const { data, count } = await query
-    .order("posted_at", { ascending: false })
-    .range(skip, skip + PAGE_SIZE - 1);
-
-  const rows = (data || []) as Row[];
-  const total = count ?? 0;
+  const sql = db();
+  // Parametreli sorgu: enjeksiyon yok; yalnız LIKE jokerleri kaçırılıyor.
+  const pat = q ? `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%` : "";
+  const where = [
+    pat ? sql`(screen_name ilike ${pat} or author_name ilike ${pat} or text ilike ${pat})` : sql`true`,
+    dil ? sql`lang = ${dil}` : sql`true`,
+    durum === "acik" ? sql`active` :
+    durum === "gizli" ? sql`not active` :
+    durum === "elle" ? sql`found_via = 'manual'` :
+    durum === "sabit" ? sql`pinned` : sql`true`,
+  ];
+  const rows = await sql<(Row & { total: number })[]>`
+    select id, screen_name, author_name, text, lang, favorite_count, reply_count, posted_at,
+           found_via, source_name, active, pinned, fail_count, count(*) over () as total
+      from tweets
+     where ${where[0]} and ${where[1]} and ${where[2]}
+     order by posted_at desc
+     limit ${PAGE_SIZE} offset ${skip}`;
+  // Sayfa boşsa (taşan offset) toplamı ayrıca say; pencere fonksiyonu satırsız döner.
+  const total = rows[0]?.total ?? (skip > 0
+    ? (await sql<{ n: number }[]>`select count(*) as n from tweets where ${where[0]} and ${where[1]} and ${where[2]}`)[0].n
+    : 0);
   const linkTo = (patch: Record<string, string>) => {
     const p = new URLSearchParams({ ...(q && { q }), ...(dil && { dil }), ...(durum && { durum }), ...patch });
     return `/admin/x?${p.toString()}`;

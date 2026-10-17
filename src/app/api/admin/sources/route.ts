@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { ADMIN_COOKIE, verifySessionToken } from "@/lib/adminAuth";
-import { supabaseAdmin } from "@/lib/supabase";
+import { db } from "@/lib/db";
 
 export const runtime = "nodejs";
 
@@ -34,12 +34,13 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "invalid active" }, { status: 400 });
   }
 
-  const sb = supabaseAdmin();
+  const sql = db();
   // Kaynak geri açılırken hata sayacı da sıfırlanır, yoksa ingest onu ilk
   // hatada tekrar kapatır (sayaç zaten limitin üstünde).
   const patch = active ? { active: true, fail_count: 0 } : { active: false };
-  const { error } = await sb.from("sources").update(patch).eq("id", id);
-  if (error) {
+  try {
+    await sql`update sources set ${sql(patch)} where id = ${id}`;
+  } catch {
     return NextResponse.json({ error: "update failed" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });

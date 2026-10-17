@@ -1,4 +1,4 @@
-import { supabaseAdmin } from "@/lib/supabase";
+import { db } from "@/lib/db";
 import { isLocale, type Locale } from "@/lib/i18n";
 import { SITE_URL } from "@/lib/seo";
 import { mailerConfigured, sendMail } from "@/lib/mailer";
@@ -65,14 +65,19 @@ export async function POST(req: Request) {
   const locale = (isLocale(body.locale || "") ? body.locale! : "tr") as Locale;
   if (!EMAIL.test(email)) return Response.json({ error: "email" }, { status: 422 });
   try {
-    const sb = supabaseAdmin();
+    const sql = db();
     // Zaten onaylı aboneyse tekrar e-posta gönderme.
-    const { data: existing } = await sb.from("subscribers").select("active").eq("email", email).maybeSingle();
+    const [existing] = await sql<{ active: boolean }[]>`select active from subscribers where email = ${email} limit 1`;
     if (existing?.active) return Response.json({ ok: true, already: true });
 
     // Çift onay (double opt-in): pasif kaydet, onay e-postası gönder.
-    const { error } = await sb.from("subscribers").upsert({ email, locale, active: false }, { onConflict: "email" });
-    if (error) return Response.json({ error: "store" }, { status: 500 });
+    try {
+      await sql`
+        insert into subscribers (email, locale, active) values (${email}, ${locale}, false)
+        on conflict (email) do update set locale = excluded.locale, active = excluded.active`;
+    } catch {
+      return Response.json({ error: "store" }, { status: 500 });
+    }
 
     if (!mailerConfigured()) return Response.json({ error: "mailer" }, { status: 503 });
     const url = `${SITE_URL}/api/confirm?token=${signToken(email, "confirm")}`;

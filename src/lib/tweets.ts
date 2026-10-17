@@ -1,4 +1,4 @@
-import { supabaseServer } from "./supabase";
+import { db } from "./db";
 import type { Locale } from "./i18n";
 
 // X tel havuzunun OKUMA katmanı. Yazma tarafı scripts/ingest-tweets.mjs ve
@@ -120,19 +120,16 @@ export function sortTweets(list: Tweet[], key: SortKey, now = Date.now()): Tweet
  * RPC her dile taban kota veriyor (bkz sql/20260820_tweets.sql).
  */
 export async function getTweets(): Promise<Tweet[]> {
-  const sb = supabaseServer();
-  const { data, error } = await sb.rpc("tweets_window", {
-    p_days: WINDOW_DAYS,
-    p_recent: WINDOW_LIMIT,
-    p_per_lang: PER_LANG_FLOOR,
-  });
-  // ⚠️ supabase-js `rpc()` HATA FIRLATMAZ — kontrol edilmezse boş sayfa ile
-  // düşmüş DB aynı ekranı üretir ve arıza sessizce aylarca sürer.
-  if (error) {
-    console.error("[tweets] pencere okuma hatası:", error.message);
+  const sql = db();
+  let data: Row[];
+  try {
+    data = await sql<Row[]>`select * from tweets_window(${WINDOW_DAYS}, ${WINDOW_LIMIT}, ${PER_LANG_FLOOR})`;
+  } catch (e) {
+    // Boş sayfa ile düşmüş DB aynı ekranı üretir — hata mutlaka loglanmalı.
+    console.error("[tweets] pencere okuma hatası:", e instanceof Error ? e.message : e);
     return [];
   }
-  return ((data ?? []) as Row[]).map(toTweet).filter((t) => SHOWN_LANGS.includes(t.lang));
+  return data.map(toTweet).filter((t) => SHOWN_LANGS.includes(t.lang));
 }
 
 // ── Dil etiketleri ────────────────────────────────────────────────────────

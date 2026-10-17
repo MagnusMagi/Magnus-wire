@@ -7,13 +7,12 @@
 // (scripts/feeds.seed.mjs) en sona yazılır ki elle ayarlanmış section/region
 // otomatik eşlemeyi ezsin.
 import { readFileSync } from "node:fs";
-import { createClient } from "@supabase/supabase-js";
-import { loadEnv, requireEnv } from "./env.mjs";
+import { connect, excludedSet, updateKeys } from "./lib/db.mjs";
+import { loadEnv } from "./env.mjs";
 import { parseSourcesMarkdown, guessCountry } from "./sources-map.mjs";
 import { FEED_SEED } from "./feeds.seed.mjs";
 
 loadEnv();
-const [SUPABASE_URL, SERVICE_ROLE] = requireEnv("SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY");
 
 const log = (...a) => console.log(new Date().toISOString(), ...a);
 
@@ -70,11 +69,11 @@ async function main() {
   log(`kürasyonlu çekirdek: ${FEED_SEED.length} (${before + FEED_SEED.length - byUrl.size} tanesi listede zaten vardı)`);
 
   const rows = [...byUrl.values()];
-  const sb = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
+  const sql = connect();
 
-  // PostgREST tek istekte büyük gövdeleri sevmiyor → parça parça yaz.
-  // Gönderilen kolonlar HER satırda aynı olmalı: supabase-js tek INSERT'e
-  // birleştiriyor ve eksik kolona NULL yazıyor.
+  // Parça parça yaz (tek INSERT'te parametre sayısı sınırlı).
+  // Gönderilen kolonlar HER satırda aynı olmalı: tek INSERT'e birleşiyor ve
+  // ilk satırın kolonları esas alınıyor.
   // `active` ve rotasyon sayaçları (last_fetched_at, fail_count...) bilerek
   // GÖNDERİLMİYOR — yeni satırlar DEFAULT true ile gelir, mevcut satırlarda
   // ingest'in otomatik kapattığı kaynaklar geri açılmaz, ilerleme sıfırlanmaz.
@@ -82,8 +81,9 @@ async function main() {
   let written = 0;
   for (let i = 0; i < rows.length; i += CHUNK) {
     const chunk = rows.slice(i, i + CHUNK);
-    const { error } = await sb.from("sources").upsert(chunk, { onConflict: "url" });
-    if (error) { log("yazma hatası", error.message); process.exit(1); }
+    try {
+      await sql`insert into sources ${sql(chunk)} on conflict (url) do update set ${excludedSet(sql, updateKeys(chunk, "url"))}`;
+    } catch (e) { log("yazma hatası", e.message); process.exit(1); }
     written += chunk.length;
     log(`yazıldı ${written}/${rows.length}`);
   }
@@ -92,15 +92,16 @@ async function main() {
   // upsert'e `active` karışırsa mevcut durumu ezerdi).
   const disabled = parsed.filter((r) => !r.active).map((r) => r.url);
   if (disabled.length) {
-    const { error } = await sb.from("sources").update({ active: false }).in("url", disabled);
-    if (error) log("kapatma hatası", error.message);
-    else log(`dosyada ❌ olan ${disabled.length} kaynak kapatıldı`);
+    try {
+      await sql`update sources set active = false where url in ${sql(disabled)}`;
+      log(`dosyada ❌ olan ${disabled.length} kaynak kapatıldı`);
+    } catch (e) { log("kapatma hatası", e.message); }
   }
 
-  const { count } = await sb.from("sources").select("*", { count: "exact", head: true });
+  const [{ count }] = await sql`select count(*) as count from sources`;
   log(`bitti. tabloda toplam: ${count}`);
 }
 
-// Açıkça exit: supabase istemcisinin keep-alive soketleri event loop'u açık
+// Açıkça exit: keep-alive soketleri event loop'u açık
 // tutuyor (bkz ingest.mjs'teki aynı not).
 main().then(() => process.exit(0)).catch((e) => { log("FATAL", e.message); process.exit(1); });

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { db } from "@/lib/db";
 
 export const runtime = "nodejs";
 
@@ -23,8 +23,8 @@ export async function POST(req: Request) {
     if (limited(ip)) return NextResponse.json({ ok: false, error: "rate_limited" }, { status: 429 });
     const { slug } = await req.json();
     if (!slug || typeof slug !== "string") return NextResponse.json({ ok: false }, { status: 400 });
-    const sb = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
-    await sb.rpc("increment_views", { s: slug.slice(0, 80) });
+    const sql = db();
+    await sql`update dispatches set views = views + 1 where slug = ${slug.slice(0, 80)}`;
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ ok: false }, { status: 500 });

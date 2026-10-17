@@ -15,11 +15,10 @@
 // ÖNCE kaybedilenleri geri getirmek için. Periyodik koşturmak da zararsız:
 // gerçekten ölü olan kaynak birkaç turda yeniden kapanır, yani süreç
 // kendi kendini düzeltir.
-import { createClient } from "@supabase/supabase-js";
-import { loadEnv, requireEnv } from "./env.mjs";
+import { connect } from "./lib/db.mjs";
+import { loadEnv } from "./env.mjs";
 
 loadEnv();
-const [SUPABASE_URL, SERVICE_ROLE] = requireEnv("SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY");
 const APPLY = process.argv.includes("--apply");
 const log = (...a) => console.log(new Date().toISOString(), ...a);
 
@@ -27,12 +26,11 @@ const log = (...a) => console.log(new Date().toISOString(), ...a);
 const TRANSIENT_RE = /\b(403|408|425|429|500|502|503|504)\b|timed out|timeout|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|socket hang up|network|aborted/i;
 
 async function main() {
-  const sb = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
-  const { data, error } = await sb
-    .from("sources")
-    .select("id,url,name,last_status,fail_count")
-    .eq("active", false);
-  if (error) { log("okuma hatası", error.message); process.exit(1); }
+  const sql = connect();
+  let data;
+  try {
+    data = await sql`select id, url, name, last_status, fail_count from sources where not active`;
+  } catch (e) { log("okuma hatası", e.message); process.exit(1); }
 
   const revive = data.filter((r) => TRANSIENT_RE.test(String(r.last_status || "")));
   const keepDead = data.length - revive.length;
@@ -55,8 +53,10 @@ async function main() {
   const CHUNK = 100;
   for (let i = 0; i < revive.length; i += CHUNK) {
     const ids = revive.slice(i, i + CHUNK).map((r) => r.id);
-    const { error: e } = await sb.from("sources").update({ active: true, fail_count: 0 }).in("id", ids);
-    if (e) log("yazma hatası", e.message); else ok += ids.length;
+    try {
+      await sql`update sources set active = true, fail_count = 0 where id in ${sql(ids)}`;
+      ok += ids.length;
+    } catch (e) { log("yazma hatası", e.message); }
   }
   log(`${ok} kaynak geri açıldı. Gerçekten ölü olanlar birkaç turda yeniden kapanacak.`);
 }

@@ -15,12 +15,12 @@
 // Maliyeti düşük tutmak için kaynaklar TOPLU gönderilir (BATCH tanesi bir
 // çağrıda): 774 kaynak ~39 çağrı ≈ $0.12. Tek tek sorulsaydı 774 çağrı olurdu.
 import { readFileSync, writeFileSync } from "node:fs";
-import { createClient } from "@supabase/supabase-js";
+import { connect } from "./lib/db.mjs";
 import { loadEnv, requireEnv } from "./env.mjs";
 
 loadEnv();
-const [SUPABASE_URL, SERVICE_ROLE, OPENAI_API_KEY] = requireEnv(
-  "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "OPENAI_API_KEY",
+const [OPENAI_API_KEY] = requireEnv(
+  "OPENAI_API_KEY",
 );
 // ⚠️ gpt-4o-mini bu iş için YETERSİZ, ölçüldü (2026-08-18, aynı prompt, 774 kaynak):
 //   gpt-4o-mini → 161 öneri, bunların 35'i bölüm SİLME ve hepsi uydurma.
@@ -200,7 +200,7 @@ SADECE YANLIŞ olanları döndür. Doğru olanları listeleme. JSON:
 }
 
 async function main() {
-  const sb = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
+  const sql = connect();
 
   // --from: önceden üretilmiş (ve İNSAN TARAFINDAN AYIKLANMIŞ) bulguları
   // uygular. Yeniden denetim çalıştırmaz — model kararı ile uygulama arasına
@@ -213,18 +213,22 @@ async function main() {
     if (!APPLY) { log("--apply verilmedi, hiçbir şey yazılmadı"); return; }
     let ok = 0;
     for (const f of saved) {
-      const { error: e } = await sb.from("sources").update(f.change).eq("id", f.id);
-      if (e) log("yazma hatası", f.url, e.message); else ok++;
+      try {
+        await sql`update sources set ${sql(f.change)} where id = ${f.id}`;
+        ok++;
+      } catch (e) { log("yazma hatası", f.url, e.message); }
     }
     log(`${ok}/${saved.length} kaynak güncellendi`);
     return;
   }
-  let q = sb.from("sources").select("id,url,name,country,section,category,priority").order("priority", { ascending: false }).order("id");
-  if (LIMIT) q = q.limit(LIMIT);
-  const { data, error } = await q;
-  if (error) { log("okuma hatası", error.message); process.exit(1); }
-  const { data: vocab } = await sb.from("sources").select("country").not("country", "is", null);
-  COUNTRY_VOCAB = [...new Set((vocab || []).map((v) => v.country))].sort();
+  let data;
+  try {
+    data = await sql`
+      select id, url, name, country, section, category, priority from sources
+       order by priority desc, id ${LIMIT ? sql`limit ${LIMIT}` : sql``}`;
+  } catch (e) { log("okuma hatası", e.message); process.exit(1); }
+  const vocab = await sql`select distinct country from sources where country is not null`;
+  COUNTRY_VOCAB = vocab.map((v) => v.country).sort();
   log(`denetlenecek kaynak: ${data.length}, parti boyu ${BATCH}, ülke sözlüğü ${COUNTRY_VOCAB.length}, model ${MODEL}`);
 
   const batches = [];
@@ -292,8 +296,9 @@ async function main() {
     process.exit(1);
   }
   for (const f of findings) {
-    const { error: e } = await sb.from("sources").update(f.change).eq("id", f.row.id);
-    if (e) log("yazma hatası", f.row.url, e.message);
+    try {
+      await sql`update sources set ${sql(f.change)} where id = ${f.row.id}`;
+    } catch (e) { log("yazma hatası", f.row.url, e.message); }
   }
   log(`${findings.length} kaynak güncellendi`);
 }

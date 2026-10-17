@@ -1,14 +1,12 @@
-// MagiWire — RSS → OpenAI (TR/EN/ET + bölge) → Supabase
+// MagiWire — RSS → OpenAI (TR/EN/ET + bölge) → Postgres
 import Parser from "rss-parser";
 import { CONFLICTS, conflictAllowed } from "./lib/conflicts.mjs";
 import { FEED_SEED } from "./feeds.seed.mjs";
-import { createClient } from "@supabase/supabase-js";
+import { connect } from "./lib/db.mjs";
 import { loadEnv } from "./env.mjs";
 
 loadEnv();
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 // ⚠️ Hacim, sitenin tuttuğu içerikle orantılı olmalı. Eskiden tur başına 24 ×
@@ -290,25 +288,26 @@ async function rewrite(item, source = {}) {
 
 // Bu koşuda çekilecek kaynakları seçer.
 // Öncelik: INGEST_FEEDS env (elle deneme) → DB rotasyonu → kürasyonlu çekirdek.
-async function selectFeeds(sb) {
+async function selectFeeds(sql) {
   if (process.env.INGEST_FEEDS) {
     const list = process.env.INGEST_FEEDS.split(",").map((s) => ({ url: s.trim() })).filter((f) => f.url);
     log(`kaynak: INGEST_FEEDS env (${list.length})`);
     return list;
   }
-  const cols = "id,url,name,section,region,country,fail_count,priority";
+  const cols = sql(["id", "url", "name", "section", "region", "country", "fail_count", "priority"]);
   // Çekirdek (priority) rotasyona TABİ DEĞİL: her koşuda çekilir. Havuz 1421'e
   // çıkınca bunlar da kuyruğa girmişti ve 30 dk yerine ~12 saatte bir
   // çekiliyorlardı — son dakika haberi yarım gün gecikiyordu.
-  const [core, rest] = await Promise.all([
-    sb.from("sources").select(cols).eq("active", true).eq("priority", true),
-    sb.from("sources").select(cols).eq("active", true).eq("priority", false)
+  let core, rest;
+  try {
+    [core, rest] = await Promise.all([
+      sql`select ${cols} from sources where active and priority`,
       // FIFO rotasyon: hiç çekilmemişler (null) en önde.
-      .order("last_fetched_at", { ascending: true, nullsFirst: true })
-      .limit(FEEDS_PER_RUN),
-  ]);
-  if (core.error || rest.error) {
-    log("sources okunamadı, çekirdeğe düşülüyor:", (core.error || rest.error).message);
+      sql`select ${cols} from sources where active and not priority
+           order by last_fetched_at asc nulls first limit ${FEEDS_PER_RUN}`,
+    ]);
+  } catch (e) {
+    log("sources okunamadı, çekirdeğe düşülüyor:", e.message);
     return FEED_SEED.map((f) => ({ ...f, isCore: true }));
   }
   // ⚠️ Çekirdek şerit KARIŞTIRILIR. Rotasyon havuzu FIFO ile adil dolaşılıyor
@@ -317,10 +316,10 @@ async function selectFeeds(sb) {
   // Sonuç: 5 sağlıklı girisim kaynağı (sifted/webrazzi/eu-startups/techcrunch)
   // öğe döndürdüğü halde bölüm günlerce BOŞ kaldı. Karıştırma her koşuda farklı
   // çekirdek feed'lere öncelik verir, zamanla hepsi pay alır.
-  const coreRows = (core.data || [])
+  const coreRows = core
     .map((f) => ({ ...f, isCore: true, _r: Math.random() }))
     .sort((a, b) => a._r - b._r);
-  const restRows = (rest.data || []).map((f) => ({ ...f, isCore: false }));
+  const restRows = rest.map((f) => ({ ...f, isCore: false }));
   if (!coreRows.length && !restRows.length) {
     log("sources boş, çekirdeğe düşülüyor (scripts/import-sources.mjs koştur)");
     return FEED_SEED.map((f) => ({ ...f, isCore: true }));
@@ -368,7 +367,7 @@ async function fetchFeed(parser, url) {
   throw last;
 }
 
-async function recordFeedStats(sb, feeds, stats) {
+async function recordFeedStats(sql, feeds, stats) {
   const now = new Date().toISOString();
   const updates = [];
   for (let i = 0; i < feeds.length; i++) {
@@ -386,8 +385,16 @@ async function recordFeedStats(sb, feeds, stats) {
     });
   }
   if (!updates.length) return;
-  const { error } = await sb.from("sources").upsert(updates, { onConflict: "id" });
-  if (error) { log("kaynak istatistiği yazılamadı:", error.message); return; }
+  // Satırlar zaten var (id'leri DB'den geldi) → toplu UPDATE ... FROM (VALUES).
+  try {
+    await sql`
+      update sources s
+         set last_fetched_at = v.last_fetched_at::timestamptz, last_status = v.last_status,
+             fail_count = v.fail_count::int, item_count = v.item_count::int
+        from (values ${sql(updates.map((u) => [u.id, u.last_fetched_at, u.last_status, u.fail_count, u.item_count]))})
+             as v(id, last_fetched_at, last_status, fail_count, item_count)
+       where s.id = v.id::bigint`;
+  } catch (e) { log("kaynak istatistiği yazılamadı:", e.message); return; }
 
   // Üst üste çok hata veren kaynakları kapat — eşik hatanın TÜRÜNE bağlı
   // (bkz TRANSIENT_FAIL_LIMIT). Karar son hataya göre verilir: bir kaynak
@@ -396,23 +403,25 @@ async function recordFeedStats(sb, feeds, stats) {
     .filter((u) => u.fail_count >= (isTransient(u.last_status) ? TRANSIENT_FAIL_LIMIT : FAIL_LIMIT))
     .map((u) => u.id);
   if (dead.length) {
-    const { error: e2 } = await sb.from("sources").update({ active: false }).in("id", dead);
-    if (!e2) log(`ölü kaynak kapatıldı: ${dead.length}`);
+    try {
+      await sql`update sources set active = false where id in ${sql(dead)}`;
+      log(`ölü kaynak kapatıldı: ${dead.length}`);
+    } catch (e) { log("ölü kaynak kapatılamadı:", e.message); }
   }
   const nursing = updates.filter((u) => !u.last_status?.startsWith("ok") && isTransient(u.last_status) && u.fail_count >= FAIL_LIMIT).length;
   if (nursing) log(`geçici hatayla ayakta tutulan kaynak: ${nursing} (kalıcı eşik ${TRANSIENT_FAIL_LIMIT})`);
 }
 
 async function main() {
-  for (const [k, v] of Object.entries({ SUPABASE_URL, SERVICE_ROLE, OPENAI_API_KEY })) if (!v) { log("HATA eksik env", k); process.exit(1); }
-  const sb = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
+  for (const [k, v] of Object.entries({ OPENAI_API_KEY })) if (!v) { log("HATA eksik env", k); process.exit(1); }
+  const sql = connect();
   // timeout/headers artık fetchFeed'in işi; parser yalnız parseString için.
   const parser = new Parser({ customFields: { item: [["media:content","media",{keepArray:true}],["media:thumbnail","mediaThumb"],"content:encoded"] } });
 
-  const { data: existing } = await sb.from("dispatches").select("source_url,title").not("source_url", "is", null).limit(1000);
-  const seen = new Set((existing || []).map((r) => r.source_url));
+  const existing = await sql`select source_url, title from dispatches where source_url is not null limit 1000`;
+  const seen = new Set(existing.map((r) => r.source_url));
 
-  const feeds = await selectFeeds(sb);
+  const feeds = await selectFeeds(sql);
 
   // Eşzamanlı çekim: havuz CONCURRENCY kadar feed'i paralel işler. perFeed
   // sırası feeds sırasıyla AYNI kalmalı (round-robin adaleti buna dayanıyor),
@@ -449,7 +458,7 @@ async function main() {
   log(`feed: ${feeds.length} çekildi, ${okCount} başarılı, ${feeds.length - okCount} hatalı`);
   // Rotasyon saatini hemen yaz: sonraki adımlar patlasa bile bu koşuda çekilen
   // kaynaklar kuyruğun sonuna gitsin, yoksa aynı 60 kaynak sonsuza dek dönerdi.
-  await recordFeedStats(sb, feeds, stats);
+  await recordFeedStats(sql, feeds, stats);
 
   // round-robin: her feed'den sırayla (görselli feed'ler de paya girsin)
   const roundRobin = (lists) => {
@@ -532,8 +541,9 @@ async function main() {
         title: o.tr.title, summary: o.tr.summary, body: o.tr.body,
         content: { tr: o.tr, en: o.en, et: o.et },
       };
-      const { error } = await sb.from("dispatches").upsert(row, { onConflict: "source_url", ignoreDuplicates: true });
-      if (error) { log("insert hatası", slug, error.message); continue; }
+      try {
+        await sql`insert into dispatches ${sql(row)} on conflict (source_url) do nothing`;
+      } catch (e) { log("insert hatası", slug, e.message); continue; }
       inserted++; seenTitles.push(nt); if (secCount[o.section] != null) secCount[o.section]++;
       log("eklendi:", o.section, o.region || "-", slug);
     } catch (e) { skips.hata++; log("öğe hatası", item.link, e.message); }
@@ -546,16 +556,15 @@ async function main() {
   log(`maliyet: ${tokenUse.calls} çağrı, girdi ${tokenUse.in} + çıktı ${tokenUse.out} token, ` +
       `bu koşu $${cost.toFixed(4)} → günlük ~$${(cost * 48).toFixed(2)}, aylık ~$${(cost * 48 * 30).toFixed(2)}`);
 
-  const { data: newest } = await sb.from("dispatches").select("id").order("published_at", { ascending: false }).limit(1);
-  if (newest?.[0]) { await sb.from("dispatches").update({ live: false }).neq("id", newest[0].id); await sb.from("dispatches").update({ live: true }).eq("id", newest[0].id); }
+  await sql`
+    update dispatches set live = (id = (select id from dispatches order by published_at desc limit 1))
+     where live is distinct from (id = (select id from dispatches order by published_at desc limit 1))`;
 
   // Budama: önce BÖLÜM BAŞINA, sonra global tavan.
   // Tek global tavan gündem'in vitrini kaplamasına yol açıyordu (200 haberin
   // 91'i gundem, oyun/otomobil/savunma/yaşam ise tamamen boş). Her bölüm artık
   // kendi penceresinde yarışıyor.
-  const { data: all } = await sb.from("dispatches")
-    .select("id,section")
-    .order("published_at", { ascending: false });
+  const all = await sql`select id, section from dispatches order by published_at desc`;
   if (all?.length) {
     const perSection = {};
     const drop = [];
@@ -569,25 +578,24 @@ async function main() {
     // Bölüm kotalarından sonra hâlâ tavanı aşıyorsa en eskiler gider.
     if (survivors.length > KEEP) drop.push(...survivors.slice(KEEP));
     if (drop.length) {
-      // ⚠️ Parça parça sil: `in` filtresi URL'e gömülüyor, birkaç yüz id
-      // PostgREST'in URL sınırını aşabiliyor.
       let deleted = 0;
-      for (let i = 0; i < drop.length; i += 100) {
-        const { error } = await sb.from("dispatches").delete().in("id", drop.slice(i, i + 100));
-        if (error) { log("budama hatası", error.message); break; }
-        deleted += Math.min(100, drop.length - i);
-      }
+      try {
+        deleted = (await sql`delete from dispatches where id in ${sql(drop)}`).count;
+      } catch (e) { log("budama hatası", e.message); }
       log(`budama: ${deleted} (bölüm kotası ${bolumBasina}, global tavan ${drop.length - bolumBasina})`);
     }
   }
 
   if (process.env.REVALIDATE_SECRET) {
-    try { const r = await fetch("http://127.0.0.1:3360/api/revalidate", { method: "POST", headers: { "x-revalidate-secret": process.env.REVALIDATE_SECRET } }); log("revalidate:", r.status); } catch (e) { log("revalidate hatası", e.message); }
+    // Site artık Vercel'de: REVALIDATE_URL tam adres (https://.../api/revalidate).
+    const revalidateUrl = process.env.REVALIDATE_URL || "http://127.0.0.1:3360/api/revalidate";
+    try { const r = await fetch(revalidateUrl, { method: "POST", headers: { "x-revalidate-secret": process.env.REVALIDATE_SECRET } }); log("revalidate:", r.status); } catch (e) { log("revalidate hatası", e.message); }
   }
   if (articleStats.tried) {
     log(`makale çekimi: ${articleStats.ok}/${articleStats.tried} başarılı, ${articleStats.failed} başarısız, +${Math.round(articleStats.gained / 1000)}k karakter bağlam`);
   }
   log(`bitti. eklenen: ${inserted}`);
+  await sql.end({ timeout: 5 });
 }
 // ⚠️ Açıkça exit ŞART. Eşzamanlı fetch'ten sonra keep-alive soketleri açık
 // kalıyor ve main() bittiği halde event loop kapanmıyor (süreç ep_poll'da

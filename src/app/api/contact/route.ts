@@ -1,4 +1,4 @@
-import { supabaseAdmin } from "@/lib/supabase";
+import { db } from "@/lib/db";
 import { isLocale } from "@/lib/i18n";
 
 export const runtime = "nodejs";
@@ -29,10 +29,13 @@ export async function POST(req: Request) {
   if (!EMAIL.test(email)) return Response.json({ error: "email" }, { status: 422 });
   if (message.length < 2) return Response.json({ error: "message" }, { status: 422 });
   try {
-    const sb = supabaseAdmin();
+    const sql = db();
     const ua = req.headers.get("user-agent")?.slice(0, 300) || null;
-    const { error } = await sb.from("contact_messages").insert({ name, email, message, locale, user_agent: ua });
-    if (error) return Response.json({ error: "store" }, { status: 500 });
+    try {
+      await sql`insert into contact_messages (name, email, message, locale, user_agent) values (${name}, ${email}, ${message}, ${locale}, ${ua})`;
+    } catch {
+      return Response.json({ error: "store" }, { status: 500 });
+    }
     return Response.json({ ok: true });
   } catch {
     return Response.json({ error: "server" }, { status: 500 });
