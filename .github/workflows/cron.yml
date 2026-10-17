@@ -1,0 +1,57 @@
+# Ingest cron'ları (VPS crontab'ının yerine).
+#
+# ⚠️ GitHub zamanlanmış koşuları birkaç dakika geciktirebilir; haber için sorun
+# değil. `concurrency` eski `flock -n`'in yerini tutar: aynı iş üst üste
+# binmez, en fazla bir koşu sırada bekler.
+# ⚠️ Script'ler açıkça process.exit ile biter (keep-alive soketleri event
+# loop'u açık tutuyordu); timeout-minutes yine de asılı koşuyu keser.
+name: cron
+
+on:
+  schedule:
+    - cron: "*/30 * * * *" # haber ingest
+    - cron: "*/10 * * * *" # X ingest
+    - cron: "20 3 * * *"   # çatışma etiketi backfill
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "Elle koşturulacak iş"
+        required: true
+        type: choice
+        options: [ingest, x-ingest, conflicts]
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: cron-${{ github.event.schedule || inputs.job }}
+      cancel-in-progress: false
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+      REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+      REVALIDATE_URL: ${{ vars.REVALIDATE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prod
+
+      - name: haber ingest
+        if: github.event.schedule == '*/30 * * * *' || inputs.job == 'ingest'
+        run: node scripts/ingest.mjs
+
+      - name: X ingest
+        if: github.event.schedule == '*/10 * * * *' || inputs.job == 'x-ingest'
+        run: node scripts/ingest-tweets.mjs
+
+      - name: çatışma backfill
+        if: github.event.schedule == '20 3 * * *' || inputs.job == 'conflicts'
+        run: node scripts/backfill-conflicts.mjs --apply
