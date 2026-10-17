@@ -3,7 +3,7 @@ import { CatNav } from "@/components/CatNav";
 import { FollowButton } from "@/components/FollowButton";
 import { XBoard } from "@/components/x/XBoard";
 import { XMark } from "@/components/x/XMark";
-import { getTweets } from "@/lib/tweets";
+import { getTweets } from "@/lib/tweetsServer";
 import { LOCALES, t, isLocale, type Locale } from "@/lib/i18n";
 import { SITE_URL, altLanguages } from "@/lib/seo";
 

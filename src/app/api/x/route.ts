@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getTweets } from "@/lib/tweets";
+import { getTweets } from "@/lib/tweetsServer";
 
 export const runtime = "nodejs";
 // Havuz 10 dakikada bir cron'la değişiyor; sayfadaki yoklama bu ucu 90 saniyede
